@@ -18,12 +18,27 @@ using namespace std;
 
 
 //======================= MULTITHREADING PIPES =======================
+template <typename T>
+struct MultiProducerMultiConsumerQueue {
+  mutex m;
+  condition_variable cv;
+  queue<T> q;
+  bool isShutdown;
+
+  MultiProducerMultiConsumerQueue();
+
+  bool push(T x);
+
+  bool pop(T& x);
+};
+
+
 template <typename T, int SIZE>
-struct SingleProdSingleConsQueue {
+struct SingleProducerSingleConsumerQueue {
   atomic<size_t> head, tail;
   T buffer[SIZE];
 
-  SingleProdSingleConsQueue (); 
+  SingleProducerSingleConsumerQueue(); 
 
   bool isLockFree();
 
@@ -34,15 +49,15 @@ struct SingleProdSingleConsQueue {
 
 
 template <typename T, int SIZE>
-SingleProdSingleConsQueue<T,SIZE>::SingleProdSingleConsQueue () : head(0), tail(0) {} 
+SingleProducerSingleConsumerQueue<T,SIZE>::SingleProducerSingleConsumerQueue() : head(0), tail(0) {} 
 
 template <typename T, int SIZE>
-bool SingleProdSingleConsQueue<T,SIZE>::isLockFree() {
+bool SingleProducerSingleConsumerQueue<T,SIZE>::isLockFree() {
   return head.is_lock_free() && tail.is_lock_free();
 }
 
 template <typename T, int SIZE>
-bool SingleProdSingleConsQueue<T,SIZE>::push(T x) {
+bool SingleProducerSingleConsumerQueue<T,SIZE>::push(T x) {
   size_t current_head = head.load(memory_order_relaxed);
   if (SIZE-1 == (current_head - tail.load(memory_order_acquire))) return false;
 
@@ -52,7 +67,7 @@ bool SingleProdSingleConsQueue<T,SIZE>::push(T x) {
 }
 
 template <typename T, int SIZE>
-bool SingleProdSingleConsQueue<T,SIZE>::pop(T& x) {
+bool SingleProducerSingleConsumerQueue<T,SIZE>::pop(T& x) {
   size_t current_tail = tail.load(memory_order_relaxed);
   if (current_tail == head.load(memory_order_acquire)) return false;
 
@@ -61,34 +76,27 @@ bool SingleProdSingleConsQueue<T,SIZE>::pop(T& x) {
   return true;
 }
 
+template <typename T>
+MultiProducerMultiConsumerQueue<T>::MultiProducerMultiConsumerQueue() : isShutdown(false) {} 
 
 template <typename T>
-struct MultiProducerMultiConsumerQueue {
-  mutex m;
-  condition_variable cv;
-  queue<T> q;
-
-  void push(T x);
-
-  T pop();
-};
-
-
-template <typename T>
-void MultiProducerMultiConsumerQueue<T>::push(T x) {
+bool MultiProducerMultiConsumerQueue<T>::push(T x) {
   unique_lock<mutex> lm(m);
   q.push(x);
   cv.notify_one();
+  return true;
 }
 
 template <typename T>
-T MultiProducerMultiConsumerQueue<T>::pop() {
+bool MultiProducerMultiConsumerQueue<T>::pop(T& x) {
   unique_lock<mutex> lm(m);
-  cv.wait(lm, [&](){ return false == q.empty(); });
+  cv.wait(lm, [&](){ return (false == q.empty()) || (true == isShutdown); });
 
-  T x = q.front();
+  if (true == isShutdown) return false;
+
+  x = q.front();
   q.pop();
-  return x;
+  return true;
 }
 
 
@@ -126,11 +134,11 @@ struct Event {
 struct Notifier {
   Notifier();
 
-  SingleProdSingleConsQueue<Event, 512> events;
-  unordered_map<uint16_t, SingleProdSingleConsQueue<Event, 512>*> clients;
+  SingleProducerSingleConsumerQueue<Event, 512> events;
+  unordered_map<uint16_t, SingleProducerSingleConsumerQueue<Event, 512>*> clients;
   bool isShutdown;
 
-  void registerClient(uint16_t id, SingleProdSingleConsQueue<Event, 512>* events);
+  void registerClient(uint16_t id, SingleProducerSingleConsumerQueue<Event, 512>* events);
 
   void run();
 };
@@ -206,7 +214,8 @@ void Engine::run() {
   while (false == isShutdown)
   {
     // blocking call
-    InputOrder newOrder = q.pop(); 
+    InputOrder newOrder;
+    q.pop(newOrder); 
     placeOrder(newOrder.instrument, newOrder.side, newOrder.trader, newOrder.qty);
   }
 }
@@ -283,7 +292,7 @@ struct Exchange {
 struct TradingTool {
   TradingTool(uint16_t identifier);
 
-  SingleProdSingleConsQueue<Event, 512> events;
+  SingleProducerSingleConsumerQueue<Event, 512> events;
   MultiProducerMultiConsumerQueue<InputOrder>* q;
   uint16_t id;
   bool isShutdown;
@@ -334,7 +343,7 @@ void Exchange::registerClient(uint16_t id, TradingTool* client) {
   notif.registerClient(id, &client->events);
 }
 
-void Notifier::registerClient(uint16_t id, SingleProdSingleConsQueue<Event, 512>* events) {
+void Notifier::registerClient(uint16_t id, SingleProducerSingleConsumerQueue<Event, 512>* events) {
   clients[id] = events;
 }
 
@@ -491,12 +500,12 @@ TEST(ThreadSafeQueueTest, OneThread_perf)
 
     if (i >= 10000)
     {
-      order = q.pop();
+      q.pop(order);
       ASSERT_TRUE ((InputOrder{'A', static_cast<uint16_t>(x-10000), static_cast<uint16_t>(x-10000), (x % 2) ? Buy : Sell}) == order);
     }
   }
 
-  for (int i = 0; i < 10000; i++) q.pop();
+  for (int i = 0; i < 10000; i++) q.pop(order);
 }
 
 TEST(ThreadSafeQueueTest, TwoThreads_perf)
@@ -513,7 +522,8 @@ TEST(ThreadSafeQueueTest, TwoThreads_perf)
   for (uint32_t i = 0; i < 1000000; i++)
   {
     uint16_t x = static_cast<uint16_t>(i);
-    InputOrder order = q.pop();
+    InputOrder order;
+    q.pop(order);
     ASSERT_TRUE ((InputOrder{'A', x, x, (x % 2) ? Buy : Sell}) == order);
   }
 
@@ -522,7 +532,7 @@ TEST(ThreadSafeQueueTest, TwoThreads_perf)
 
 TEST(LocklessQueueTest, TwoThreads_perf)
 {
-  SingleProdSingleConsQueue<Event,800> q;
+  SingleProducerSingleConsumerQueue<Event,800> q;
   thread t1([&]() {
     uint32_t c = 0;
     while (c < 1000000)
