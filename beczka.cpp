@@ -9,6 +9,10 @@
 #include <chrono>
 #include <mutex>
 #include <condition_variable>
+
+
+//tests
+#include "gtest/gtest.h"
 using namespace std;
 
 
@@ -99,6 +103,7 @@ struct InputOrder {
   uint16_t trader;
   uint16_t qty;
   Side side;
+  bool operator==(const InputOrder& rhs) { return instrument == rhs.instrument&& trader == rhs.trader && qty == rhs.qty && side == rhs.side; }
 };
 
 struct Order {
@@ -170,7 +175,8 @@ void Notifier::run() {
 
 
 struct Book {
-  Book() : actualSide(None) {}
+  Book() : actualSide(None), outstandingQty(0) {}
+  uint16_t outstandingQty;
   Side actualSide;
   deque<Order> orders;
 };
@@ -213,6 +219,7 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
   if (true == book.orders.empty() || side == book.actualSide) {
     book.actualSide = side;
     book.orders.push_back(Order{trader, qty, qty, side});
+    book.outstandingQty += qty;
 
     notify.events.push({OrderPlaced, instrument, trader, qty, side});
   }
@@ -223,11 +230,13 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
       if (top.remainQty > remainQty)
       {
         top.remainQty -= remainQty;
+        book.outstandingQty -= remainQty;
         remainQty = 0;
       }
       else {
         remainQty -= top.remainQty;
         book.orders.pop_front();
+        book.outstandingQty -= top.remainQty;
 
         notify.events.push({Exec, instrument, top.trader, top.qty, top.side});
       }
@@ -241,8 +250,19 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
     {
       book.actualSide = side;
       book.orders.push_back(Order{trader, qty, remainQty, side});
+      book.outstandingQty += remainQty;
       notify.events.push({OrderPlaced, instrument, trader, qty, side});
     }
+  }
+
+  // market data
+  if (false == book.orders.empty())
+  {
+    notify.events.push({Tick, instrument, 0, book.outstandingQty, book.actualSide});
+  }
+  else
+  {
+    notify.events.push({Tick, instrument, 0, 0, None});
   }
 }
 
@@ -319,66 +339,227 @@ void Notifier::registerClient(uint16_t id, SingleProdSingleConsQueue<Event, 512>
 }
 
 
-//========================   MAIN MAIN  ==============================
-int main() {
-  cout << "start\n";
-  Event event;
 
+//========================  TESTS TESTS ==============================
+TEST(MatchingEngineTest, FourOrders)
+{
   Exchange ex;
-  TradingTool t1(666); t1.connectTo(ex); 
-  TradingTool t2(777); t2.connectTo(ex); 
-
-
-
-
-  
-  Notifier notif;
-  Engine eng(notif);
+  Notifier& notif = ex.notif;
+  Engine& eng = ex.engine;
+  Event event;
 
   eng.placeOrder('A', Buy, 666, 100);
   eng.placeOrder('A', Buy, 777, 200);
   eng.placeOrder('A', Sell, 888, 200);
   eng.placeOrder('A', Sell, 888, 100);
-  assert (true == notif.events.pop(event) && (Event{OrderPlaced,'A',666,100,Buy}) == event);
-  assert (true == notif.events.pop(event) && (Event{OrderPlaced,'A',777,200,Buy}) == event);
-  assert (true == notif.events.pop(event) && (Event{Exec,'A',666,100,Buy}) == event);
-  assert (true == notif.events.pop(event) && (Event{Exec,'A',888,200,Sell}) == event);
-  assert (true == notif.events.pop(event) && (Event{Exec,'A',777,200,Buy}) == event);
-  assert (true == notif.events.pop(event) && (Event{Exec,'A',888,100,Sell}) == event);
-  assert (false == notif.events.pop(event)); 
-  eng.placeOrder('A', Sell, 12, 10);
-  eng.placeOrder('A', Sell, 13, 20);
-  eng.placeOrder('A', Sell, 14, 30);
-  eng.placeOrder('A', Buy, 15, 10);
-  eng.placeOrder('A', Buy, 16, 20);
-  eng.placeOrder('A', Buy, 17, 30);
-  eng.placeOrder('A', Buy, 18, 40);
-  assert (true == notif.events.pop(event) && (Event{OrderPlaced,'A',12,10,Sell}) == event);
-  assert (true == notif.events.pop(event) && (Event{OrderPlaced,'A',13,20,Sell}) == event);
-  assert (true == notif.events.pop(event) && (Event{OrderPlaced,'A',14,30,Sell}) == event);
-  assert (true == notif.events.pop(event) && (Event{Exec,'A',12,10,Sell}) == event);
-  assert (true == notif.events.pop(event) && (Event{Exec,'A',15,10,Buy}) == event);
-  assert (true == notif.events.pop(event) && (Event{Exec,'A',13,20,Sell}) == event);
-  assert (true == notif.events.pop(event) && (Event{Exec,'A',16,20,Buy}) == event);
-  assert (true == notif.events.pop(event) && (Event{Exec,'A',14,30,Sell}) == event);
-  assert (true == notif.events.pop(event) && (Event{Exec,'A',17,30,Buy}) == event);
-  assert (true == notif.events.pop(event) && (Event{OrderPlaced,'A',18,40,Buy}) == event);
-  assert (false == notif.events.pop(event)); 
 
- //assert (true == notif.events.pop(event)); 
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'A',666,100,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,100,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'A',777,200,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,300,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'A',666,100,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'A',888,200,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,100,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'A',777,200,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'A',888,100,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,0,None}) == event);
+  ASSERT_TRUE (false == notif.events.pop(event));
+}
+
+TEST(MatchingEngineTest, CasesFromEmail)
+{
+  Exchange ex;
+  Notifier& notif = ex.notif;
+  Engine& eng = ex.engine;
+  Event event;
+
+  eng.placeOrder('S', Buy, 1, 200);
+  eng.placeOrder('S', Sell, 2, 200);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',1,200,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,200,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',1,200,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',2,200,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,0,None}) == event);
+
+  eng.placeOrder('G', Sell, 3, 300);
+  eng.placeOrder('G', Buy, 4, 200);
+  eng.placeOrder('G', Buy, 5, 200);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'G',3,300,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'G',0,300,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'G',4,200,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'G',0,100,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'G',3,300,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'G',5,200,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'G',0,100,Buy}) == event);
+
+  eng.placeOrder('H', Sell, 6, 200);
+  eng.placeOrder('H', Sell, 7, 200);
+  eng.placeOrder('H', Sell, 8, 200);
+  eng.placeOrder('H', Buy, 9, 600);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'H',6,200,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,200,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'H',7,200,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,400,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'H',8,200,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,600,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'H',6,200,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'H',7,200,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'H',8,200,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'H',9,600,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,0,None}) == event);
+  ASSERT_TRUE (false == notif.events.pop(event));
+}
+
+TEST(MatchingEngineTest, OverEatingOneSide)
+{
+  Exchange ex;
+  Notifier& notif = ex.notif;
+  Engine& eng = ex.engine;
+  Event event;
+
+  eng.placeOrder('S', Buy, 1, 100);
+  eng.placeOrder('S', Buy, 2, 200);
+  eng.placeOrder('S', Buy, 3, 300);
+  eng.placeOrder('S', Buy, 4, 400);
+  eng.placeOrder('S', Buy, 5, 500);
+  eng.placeOrder('S', Sell, 6, 100);
+  eng.placeOrder('S', Sell, 7, 100);
+  eng.placeOrder('S', Sell, 8, 100);
+  eng.placeOrder('S', Sell, 9, 150);
+  eng.placeOrder('S', Sell, 10, 300);
+  eng.placeOrder('S', Sell, 11, 100);
+  eng.placeOrder('S', Sell, 12, 700);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',1,100,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,100,Buy}) == event);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',2,200,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,300,Buy}) == event);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',3,300,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,600,Buy}) == event);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',4,400,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1000,Buy}) == event);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',5,500,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1500,Buy}) == event);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',1,100,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',6,100,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1400,Buy}) == event);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',7,100,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1300,Buy}) == event);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',2,200,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',8,100,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1200,Buy}) == event);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',9,150,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1050,Buy}) == event);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',3,300,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',10,300,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,750,Buy}) == event);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',11,100,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,650,Buy}) == event);
+
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',4,400,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',5,500,Buy}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',12,700,Sell}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,50,Sell}) == event);
+  ASSERT_TRUE (false == notif.events.pop(event));
+
+  //assert (true == notif.events.pop(event)); 
   //cout << "type="<<event.type << ", instrument="<<event.instrument << ", trader=" << event.trader <<", qt=" << event.qty<<  endl;;
- 
+}
 
-  //assert (true == notif.events.pop(event) && (Event{Exec,'A',888,0,Sell}) == event);
+TEST(ThreadSafeQueueTest, OneThread_perf)
+{
+  MultiProducerMultiConsumerQueue<InputOrder> q; 
+  InputOrder order;
 
+  for (uint32_t i = 0; i < 1000000; i++)
+  {
+    uint16_t x = static_cast<uint16_t>(i);
+    q.push(InputOrder{'A', x,x, (x % 2) ? Buy : Sell});
 
- //assert (true == notif.events.pop(event)); 
-  //cout << "type="<<event.type << ", instrument="<<event.instrument << ", trader=" << event.trader <<", qt=" << event.qty<<  endl;;
+    if (i >= 10000)
+    {
+      order = q.pop();
+      ASSERT_TRUE ((InputOrder{'A', static_cast<uint16_t>(x-10000), static_cast<uint16_t>(x-10000), (x % 2) ? Buy : Sell}) == order);
+    }
+  }
 
+  for (int i = 0; i < 10000; i++) q.pop();
+}
 
+TEST(ThreadSafeQueueTest, TwoThreads_perf)
+{
+  MultiProducerMultiConsumerQueue<InputOrder> q; 
+  thread t1([&]() {
+    for (uint32_t i = 0; i < 1000000; i++)
+    {
+      uint16_t x = static_cast<uint16_t>(i);
+      q.push(InputOrder{'A', x, x, (x % 2) ? Buy : Sell});
+    }
+  });
 
+  for (uint32_t i = 0; i < 1000000; i++)
+  {
+    uint16_t x = static_cast<uint16_t>(i);
+    InputOrder order = q.pop();
+    ASSERT_TRUE ((InputOrder{'A', x, x, (x % 2) ? Buy : Sell}) == order);
+  }
 
+  t1.join();
+}
 
+TEST(LocklessQueueTest, TwoThreads_perf)
+{
+  SingleProdSingleConsQueue<Event,800> q;
+  thread t1([&]() {
+    uint32_t c = 0;
+    while (c < 1000000)
+    {
+      uint16_t x = static_cast<uint16_t>(c);
+      if (false == q.push(Event{Exec, 'A', x, x, (x % 2) ? Buy : Sell}))
+      {
+        this_thread::yield();
+      }
+      else
+      {
+        c++;
+      }
+    }
+  });
 
-  return 0;
+  uint32_t c = 0; 
+  while (c < 1000000)
+  {
+    uint16_t x = static_cast<uint16_t>(c);
+    Event event;
+    if (false == q.pop(event))
+    {
+      this_thread::yield();
+    }
+    else
+    {
+      ASSERT_TRUE ((Event{Exec, 'A', x, x, (x % 2) ? Buy : Sell}) == event);
+      c++;
+    }
+  }
+
+  t1.join();
+}
+
+//========================   MAIN MAIN  ==============================
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }
