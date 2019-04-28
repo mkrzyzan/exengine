@@ -41,7 +41,6 @@ template <typename T, int SIZE=(1<<16)>
 struct SingleProducerSingleConsumerQueue {
   atomic<size_t> head, tail;
   T buffer[SIZE];
-  MultiProducerMultiConsumerQueue<T> fallbackQueue;
 
   SingleProducerSingleConsumerQueue(); 
 
@@ -63,16 +62,9 @@ bool SingleProducerSingleConsumerQueue<T,SIZE>::isLockFree() {
 
 template <typename T, int SIZE>
 bool SingleProducerSingleConsumerQueue<T,SIZE>::push(const T& x) {
-  if (false == fallbackQueue.empty())
-  {
-    fallbackQueue.push(x);
-    return false;
-  }
-
   size_t current_head = head.load(memory_order_relaxed);
   if (SIZE == (current_head - tail.load(memory_order_acquire)))
   {
-    fallbackQueue.push(x);
     return false;
   }
 
@@ -87,15 +79,7 @@ bool SingleProducerSingleConsumerQueue<T,SIZE>::pop(T& x) {
   size_t current_tail = tail.load(memory_order_relaxed);
   if (current_tail == head.load(memory_order_acquire)) 
   {
-    if (false == fallbackQueue.empty())
-    {
-      fallbackQueue.pop(x);
-      return true;
-    }
-    else
-    {
-      return false;
-    }
+    return false;
   }
 
   x = buffer[current_tail % SIZE];
@@ -294,7 +278,7 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
 
     if (false == notify.events.push({OrderPlaced, instrument, trader, qty, side}))
     {
-      cout << "WARNING: events ring is full, falling back to queue!. Increse the event buffer size!.";
+      cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
     }
   }
   else
@@ -314,7 +298,7 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
 
         if (false == notify.events.push({Exec, instrument, top.trader, top.qty, top.side}))
         {
-          cout << "WARNING: events ring is full, falling back to queue!. Increse the event buffer size!.";
+          cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
         }
       }
     }
@@ -323,7 +307,7 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
     {
       if (false == notify.events.push({Exec, instrument, trader, qty, side}))
       {
-        cout << "WARNING: events ring is full, falling back to queue!. Increse the event buffer size!.";
+        cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
       }
     }
     else
@@ -333,7 +317,7 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
       book.outstandingQty += remainQty;
       if (false == notify.events.push({OrderPlaced, instrument, trader, qty, side}))
       {
-        cout << "WARNING: events ring is full, falling back to queue!. Increse the event buffer size!.";
+        cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
       }
     }
   }
@@ -343,14 +327,14 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
   {
     if (false == notify.events.push({Tick, instrument, 0, book.outstandingQty, book.actualSide}))
     {
-      cout << "WARNING: events ring is full, falling back to queue!. Increse the event buffer size!.";
+      cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
     }
   }
   else
   {
     if (false == notify.events.push({Tick, instrument, 0, 0, None}))
     {
-      cout << "WARNING: events ring is full, falling back to queue!. Increse the event buffer size!.";
+      cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
     }
   }
 }
@@ -375,7 +359,7 @@ struct Exchange {
 struct TradingTool {
   using gateway = MultiProducerMultiConsumerQueue<InputOrder>; 
 
-  TradingTool(uint16_t identifier, function<void(TradingTool*)> i,  function<void(TradingTool*,Event)> f);
+  TradingTool(uint16_t identifier);
 
   SingleProducerSingleConsumerQueue<Event> events;
 
@@ -384,22 +368,21 @@ struct TradingTool {
   uint16_t id;
   bool isShutdown;
   thread* the;
-  function<void(TradingTool*,Event)>& algo;
-  function<void(TradingTool*)>& init;
+  function<void(TradingTool*,Event)> algo;
+  function<void(TradingTool*)> init;
 
   void connectTo(Exchange& ex);
 
   void start();
   void stop();
-  void wait();
 
   void run(); 
 };
 
 
 
-TradingTool::TradingTool(uint16_t identifier, function<void(TradingTool*)> i, function<void(TradingTool*,Event)> f) 
-  : id(identifier), isShutdown(false), init(i), algo(f) {}
+TradingTool::TradingTool(uint16_t identifier) 
+  : id(identifier), isShutdown(false) {}
 
 void TradingTool::connectTo(Exchange& ex) {
   q = &ex.engine.q; 
@@ -416,19 +399,14 @@ void TradingTool::stop() {
   delete the;
 }
 
-void TradingTool::wait() {
-  the->join();
-  delete the;
-}
-
 void TradingTool::run() {
-  init(this);
+  if (init) init(this);
   while (false == isShutdown)
   {
     Event event;
     if (true == events.pop(event))
     {
-      algo(this,event);
+      if (algo) algo(this,event);
     }
     else
     {
@@ -641,36 +619,6 @@ TEST(MultiProducerMultiConsumerQueueTest, TwoThreads_perf)
   t1.join();
 }
 
-TEST(SingleProducerSingleConsumerQueueTest, FallbackFeature)
-{
-  SingleProducerSingleConsumerQueue<Event,3> q;
-  Event event;
-
-  ASSERT_TRUE (q.push(Event{Exec, 'A', 1, 1, Sell}));
-  ASSERT_TRUE (q.push(Event{Exec, 'A', 2, 2, Sell}));
-  ASSERT_TRUE (q.push(Event{Exec, 'A', 3, 3, Sell}));
-  ASSERT_FALSE (q.push(Event{Exec, 'A', 4, 4, Sell}));
-  ASSERT_FALSE (q.push(Event{Exec, 'A', 5, 5, Sell}));
-  ASSERT_FALSE (q.push(Event{Exec, 'A', 6, 6, Sell}));
-  ASSERT_FALSE (q.push(Event{Exec, 'A', 7, 7, Sell}));
-
-  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',1,1,Sell}) == event);
-  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',2,2,Sell}) == event);
-  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',3,3,Sell}) == event);
-  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',4,4,Sell}) == event);
-  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',5,5,Sell}) == event);
-
-  ASSERT_FALSE (q.push(Event{Exec, 'A', 8, 8, Sell}));
-  ASSERT_FALSE (q.push(Event{Exec, 'A', 9, 9, Sell}));
-
-  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',6,6,Sell}) == event);
-  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',7,7,Sell}) == event);
-  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',8,8,Sell}) == event);
-  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',9,9,Sell}) == event);
-
-  ASSERT_FALSE (q.pop(event));
-
-}
 
 TEST(SingleProducerSingleConsumerQueueTest, TwoThreads_perf)
 {
@@ -684,7 +632,10 @@ TEST(SingleProducerSingleConsumerQueueTest, TwoThreads_perf)
       {
         this_thread::yield();
       }
-      c++;
+      else
+      {
+        c++;
+      }
     }
   });
 
@@ -699,7 +650,13 @@ TEST(SingleProducerSingleConsumerQueueTest, TwoThreads_perf)
     }
     else
     {
-      ASSERT_TRUE ((Event{Exec, 'A', x, x, (x % 2) ? Buy : Sell}) == event);
+      //ASSERT_TRUE ((Event{Exec, 'A', x, x, (x % 2) ? Buy : Sell}) == event);
+      //ASSERT_EQ (Exec, event.type);
+      //ASSERT_EQ ('A', event.instrument);
+      ASSERT_EQ (x, event.trader);
+      //ASSERT_EQ (x, event.qty);
+      //ASSERT_EQ ( (x%2) ? Buy : Sell, event.side);
+
       c++;
     }
   }
@@ -707,7 +664,36 @@ TEST(SingleProducerSingleConsumerQueueTest, TwoThreads_perf)
   t1.join();
 }
 
-TEST(IntegrationTest, OneTraderConnectedToExchange)
+class IntegrationTest : public ::testing::Test
+{
+public:
+  IntegrationTest() : trader1(1), trader2(2) {}
+  virtual ~IntegrationTest() {}
+  virtual void SetUp() {}
+  virtual void TearDown() {}
+
+  void start() {
+    trader1.connectTo(ex);
+    trader2.connectTo(ex);
+    ex.start();
+    trader1.start();
+    trader2.start();
+  }
+
+  void stop() {
+    trader1.stop();
+    trader2.stop();
+    ex.stop();
+  }
+
+  Exchange ex;
+  TradingTool trader1, trader2;
+  mutex m;
+  condition_variable cv;
+};
+
+
+TEST_F(IntegrationTest, OneTraderConnectedToExchange)
 {
   bool orderAccepted = false;
 
@@ -715,8 +701,7 @@ TEST(IntegrationTest, OneTraderConnectedToExchange)
     me->q->push(InputOrder{'H', me->id, 10, Sell});
   };
 
-  auto algo = [&orderAccepted](TradingTool* me, Event e){
-    cout << "got event, type=" << e.type << endl;
+  auto algo = [&](TradingTool* me, Event e){
     switch(e.type)
     {
       case EventType::Exec:
@@ -725,79 +710,70 @@ TEST(IntegrationTest, OneTraderConnectedToExchange)
       }
       case EventType::OrderPlaced:
       {
-        me->isShutdown = true;
+        unique_lock<mutex> lc(m);
         orderAccepted = true;
+        cv.notify_all();
         break;
       }
     }
   };
 
-  Exchange ex;
-  TradingTool trader1(1, init, algo);
+  trader1.init = init; trader1.algo = algo;
 
-  trader1.connectTo(ex);
+  start();
 
-  ex.start();
-  trader1.start();
+  unique_lock<mutex> lc(m);
+  cv.wait_for(lc, 300ms, [&](){ return true == orderAccepted; });
 
-  trader1.wait();
-  ex.stop();
+  stop();
 
   ASSERT_TRUE (orderAccepted);
 }
 
-TEST(IntegrationTest, TwoTraderConnectedToExchange)
+TEST_F(IntegrationTest, TwoTraderConnectedToExchange)
 {
   bool orderAccepted = false;
+  bool orderExec1 = false;
+  bool orderExec2 = false;
 
   auto init = [](TradingTool* me){
-    cout << "sent order\n";
-    me->q->push(InputOrder{'H', me->id, 10, Sell});
+    me->q->push(InputOrder{'H', me->id, 10, (me->id % 2) ? Sell : Buy});
   };
 
-  auto algo = [&orderAccepted](TradingTool* me, Event e){
-    cout << "got event, type=" << e.type << endl;
+  auto algo = [&](TradingTool* me, Event e){
     switch(e.type)
     {
       case EventType::Exec:
       {
-        cout << "exec\n";
+        unique_lock<mutex> lc(m);
+        (me->id % 2) ? (orderExec1 = true) : (orderExec2 = true);
+        cv.notify_all();
         break;
       }
       case EventType::OrderPlaced:
       {
-        cout << "placed\n";
-        //me->isShutdown = true;
-        //orderAccepted = true;
+        unique_lock<mutex> lc(m);
+        orderAccepted = true;
+        cv.notify_all();
         break;
       }
     }
   };
 
-  Exchange ex;
-  TradingTool trader1(1, init, algo);
-  TradingTool trader2(2, init, algo);
+  trader1.init = init; trader1.algo = algo;
+  trader2.init = init; trader2.algo = algo;
+  
+  start();
 
-  trader1.connectTo(ex);
-  //trader2.connectTo(ex);
+  unique_lock<mutex> lc(m);
+  cv.wait_for(lc, 300ms, [&](){ return (true == orderAccepted) && (true == orderExec1) && (true == orderExec2); });
 
-  ex.start();
-  trader1.start();
-  //trader2.start();
+  stop();
 
-  this_thread::sleep_for(300ms);
-
-  trader1.wait();
-  //trader2.stop();
-  ex.stop();
-
-  //ASSERT_TRUE (orderAccepted);
+  ASSERT_TRUE (orderAccepted);
+  ASSERT_TRUE (orderExec1);
+  ASSERT_TRUE (orderExec2);
 }
-
-
-
-
-
 
 //========================   MAIN MAIN  ==============================
 int main(int argc, char** argv) {
