@@ -11,19 +11,19 @@ struct TradingTool {
 
   SingleProducerSingleConsumerQueue<Event> events;
 
-  gateway* q;
+  void connectTo(Exchange& ex);
 
+  void start();
+
+  void stop();
+
+  void run(); 
+
+  gateway* q;
   uint16_t id;
   bool isShutdown;
   thread* the;
   function<void(TradingTool*,Event)> algo;
   function<void(TradingTool*)> init;
-
-  void connectTo(Exchange& ex);
-
-  void start();
-  void stop();
-
-  void run(); 
 };
 

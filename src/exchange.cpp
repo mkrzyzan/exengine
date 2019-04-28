@@ -5,17 +5,20 @@ using namespace std;
 
 Notifier::Notifier() : isShutdown(false) {}
 
-void Notifier::start() {
+void Notifier::start() 
+{
   the = new thread([&](){this->run();});
 }
 
-void Notifier::stop() {
+void Notifier::stop() 
+{
   isShutdown = true;
   the->join();
   delete the;
 }
   
-void Notifier::run() {
+void Notifier::run() 
+{
   while (false == isShutdown) {
     Event event;
     if (true == events.pop(event))
@@ -44,18 +47,18 @@ void Notifier::run() {
   }
 }
 
+void Notifier::registerClient(uint16_t id, SingleProducerSingleConsumerQueue<Event>* events) 
+{
+  clients[id] = events;
+}
 
-
-
-
-
-
-
-void Engine::start() {
+void Engine::start() 
+{
   the = new thread([&](){this->run();});
 }
 
-void Engine::stop() {
+void Engine::stop() 
+{
   isShutdown = true;
   q.stop();
   the->join();
@@ -64,7 +67,8 @@ void Engine::stop() {
 
 Engine::Engine(Notifier& notifier) : books(), notify(notifier), isShutdown(false) {}
 
-void Engine::run() {
+void Engine::run() 
+{
   while (false == isShutdown)
   {
     // blocking call
@@ -74,7 +78,8 @@ void Engine::run() {
   }
 }
 
-void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty) {
+void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty) 
+{
   Book& book = books[instrument];
   uint16_t remainQty = qty;
 
@@ -148,7 +153,8 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
 }
 
 
-void Exchange::registerClient(uint16_t id, TradingTool* client) {
+void Exchange::registerClient(uint16_t id, TradingTool* client) 
+{
   notif.registerClient(id, &client->events);
 }
 
@@ -162,10 +168,6 @@ void Exchange::stop()
 {
   notif.stop();
   engine.stop();
-}
-
-void Notifier::registerClient(uint16_t id, SingleProducerSingleConsumerQueue<Event>* events) {
-  clients[id] = events;
 }
 
 

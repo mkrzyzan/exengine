@@ -1,4 +1,5 @@
 #pragma once
+
 #include <queue>
 #include <atomic>
 #include <mutex>
@@ -7,11 +8,6 @@ using namespace std;
 
 template <typename T>
 struct MultiProducerMultiConsumerQueue {
-  mutex m;
-  condition_variable cv;
-  queue<T> q;
-  bool isShutdown;
-
   MultiProducerMultiConsumerQueue();
 
   void stop();
@@ -21,14 +17,16 @@ struct MultiProducerMultiConsumerQueue {
   bool push(const T& x);
 
   bool pop(T& x);
+
+  mutex m;
+  condition_variable cv;
+  queue<T> q;
+  bool isShutdown;
 };
 
 
 template <typename T, int SIZE=(1<<16)>
 struct SingleProducerSingleConsumerQueue {
-  atomic<size_t> head, tail;
-  T buffer[SIZE];
-
   SingleProducerSingleConsumerQueue(); 
 
   bool isLockFree();
@@ -36,6 +34,9 @@ struct SingleProducerSingleConsumerQueue {
   bool push(const T& x);
 
   bool pop(T& x);
+
+  atomic<size_t> head, tail;
+  T buffer[SIZE];
 };
 
 
@@ -44,12 +45,14 @@ template <typename T, int SIZE>
 SingleProducerSingleConsumerQueue<T,SIZE>::SingleProducerSingleConsumerQueue() : head(0), tail(0) {} 
 
 template <typename T, int SIZE>
-bool SingleProducerSingleConsumerQueue<T,SIZE>::isLockFree() {
+bool SingleProducerSingleConsumerQueue<T,SIZE>::isLockFree() 
+{
   return head.is_lock_free() && tail.is_lock_free();
 }
 
 template <typename T, int SIZE>
-bool SingleProducerSingleConsumerQueue<T,SIZE>::push(const T& x) {
+bool SingleProducerSingleConsumerQueue<T,SIZE>::push(const T& x) 
+{
   size_t current_head = head.load(memory_order_relaxed);
   if (SIZE == (current_head - tail.load(memory_order_acquire)))
   {
@@ -62,7 +65,8 @@ bool SingleProducerSingleConsumerQueue<T,SIZE>::push(const T& x) {
 }
 
 template <typename T, int SIZE>
-bool SingleProducerSingleConsumerQueue<T,SIZE>::pop(T& x) {
+bool SingleProducerSingleConsumerQueue<T,SIZE>::pop(T& x) 
+{
 
   size_t current_tail = tail.load(memory_order_relaxed);
   if (current_tail == head.load(memory_order_acquire)) 
@@ -79,18 +83,21 @@ template <typename T>
 MultiProducerMultiConsumerQueue<T>::MultiProducerMultiConsumerQueue() : isShutdown(false) {} 
 
 template <typename T>
-bool MultiProducerMultiConsumerQueue<T>::empty() {
+bool MultiProducerMultiConsumerQueue<T>::empty() 
+{
   return q.empty();
 }
 
 template <typename T>
-void MultiProducerMultiConsumerQueue<T>::stop() {
+void MultiProducerMultiConsumerQueue<T>::stop() 
+{
   isShutdown = true;
   cv.notify_all();
 }
 
 template <typename T>
-bool MultiProducerMultiConsumerQueue<T>::push(const T& x) {
+bool MultiProducerMultiConsumerQueue<T>::push(const T& x) 
+{
   unique_lock<mutex> lm(m);
   q.push(x);
   cv.notify_one();
@@ -98,7 +105,8 @@ bool MultiProducerMultiConsumerQueue<T>::push(const T& x) {
 }
 
 template <typename T>
-bool MultiProducerMultiConsumerQueue<T>::pop(T& x) {
+bool MultiProducerMultiConsumerQueue<T>::pop(T& x)
+{
   unique_lock<mutex> lm(m);
   cv.wait(lm, [&](){ return (false == q.empty()) || (true == isShutdown); });
 
