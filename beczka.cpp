@@ -27,22 +27,27 @@ struct MultiProducerMultiConsumerQueue {
 
   MultiProducerMultiConsumerQueue();
 
-  bool push(T x);
+  void stop();
+
+  bool empty();
+
+  bool push(const T& x);
 
   bool pop(T& x);
 };
 
 
-template <typename T, int SIZE>
+template <typename T, int SIZE=(1<<16)>
 struct SingleProducerSingleConsumerQueue {
   atomic<size_t> head, tail;
   T buffer[SIZE];
+  MultiProducerMultiConsumerQueue<T> fallbackQueue;
 
   SingleProducerSingleConsumerQueue(); 
 
   bool isLockFree();
 
-  bool push(T x);
+  bool push(const T& x);
 
   bool pop(T& x);
 };
@@ -57,9 +62,19 @@ bool SingleProducerSingleConsumerQueue<T,SIZE>::isLockFree() {
 }
 
 template <typename T, int SIZE>
-bool SingleProducerSingleConsumerQueue<T,SIZE>::push(T x) {
+bool SingleProducerSingleConsumerQueue<T,SIZE>::push(const T& x) {
+  if (false == fallbackQueue.empty())
+  {
+    fallbackQueue.push(x);
+    return false;
+  }
+
   size_t current_head = head.load(memory_order_relaxed);
-  if (SIZE-1 == (current_head - tail.load(memory_order_acquire))) return false;
+  if (SIZE == (current_head - tail.load(memory_order_acquire)))
+  {
+    fallbackQueue.push(x);
+    return false;
+  }
 
   buffer[current_head % SIZE] = x;
   head.store(current_head+1, memory_order_release);
@@ -68,8 +83,20 @@ bool SingleProducerSingleConsumerQueue<T,SIZE>::push(T x) {
 
 template <typename T, int SIZE>
 bool SingleProducerSingleConsumerQueue<T,SIZE>::pop(T& x) {
+
   size_t current_tail = tail.load(memory_order_relaxed);
-  if (current_tail == head.load(memory_order_acquire)) return false;
+  if (current_tail == head.load(memory_order_acquire)) 
+  {
+    if (false == fallbackQueue.empty())
+    {
+      fallbackQueue.pop(x);
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
 
   x = buffer[current_tail % SIZE];
   tail.store(current_tail+1, memory_order_release);
@@ -80,7 +107,18 @@ template <typename T>
 MultiProducerMultiConsumerQueue<T>::MultiProducerMultiConsumerQueue() : isShutdown(false) {} 
 
 template <typename T>
-bool MultiProducerMultiConsumerQueue<T>::push(T x) {
+bool MultiProducerMultiConsumerQueue<T>::empty() {
+  return q.empty();
+}
+
+template <typename T>
+void MultiProducerMultiConsumerQueue<T>::stop() {
+  isShutdown = true;
+  cv.notify_all();
+}
+
+template <typename T>
+bool MultiProducerMultiConsumerQueue<T>::push(const T& x) {
   unique_lock<mutex> lm(m);
   q.push(x);
   cv.notify_one();
@@ -115,6 +153,7 @@ struct InputOrder {
 };
 
 struct Order {
+  Order(uint16_t trd, uint16_t qt, uint16_t rmQt, Side s) : trader(trd), qty(qt), remainQty(rmQt), side(s) {}
   uint16_t trader;
   uint16_t qty;
   uint16_t remainQty;
@@ -125,7 +164,7 @@ struct Event {
   EventType type;
   char instrument;
   uint16_t trader;
-  uint16_t qty;
+  uint32_t qty;
   Side side;
 
   bool operator==(const Event& rhs) { return type == rhs.type && instrument == rhs.instrument&& trader == rhs.trader && qty == rhs.qty && side == rhs.side; }
@@ -134,19 +173,33 @@ struct Event {
 struct Notifier {
   Notifier();
 
-  SingleProducerSingleConsumerQueue<Event, 512> events;
-  unordered_map<uint16_t, SingleProducerSingleConsumerQueue<Event, 512>*> clients;
+  SingleProducerSingleConsumerQueue<Event> events;
+  unordered_map<uint16_t, SingleProducerSingleConsumerQueue<Event>*> clients;
   bool isShutdown;
+  thread* the;
 
-  void registerClient(uint16_t id, SingleProducerSingleConsumerQueue<Event, 512>* events);
+  void registerClient(uint16_t id, SingleProducerSingleConsumerQueue<Event>* events);
 
+  void start();
+  void stop();
   void run();
+
 };
 
 
 
 Notifier::Notifier() : isShutdown(false) {}
 
+void Notifier::start() {
+  the = new thread([&](){this->run();});
+}
+
+void Notifier::stop() {
+  isShutdown = true;
+  the->join();
+  delete the;
+}
+  
 void Notifier::run() {
   while (false == isShutdown) {
     Event event;
@@ -184,7 +237,7 @@ void Notifier::run() {
 
 struct Book {
   Book() : actualSide(None), outstandingQty(0) {}
-  uint16_t outstandingQty;
+  uint32_t outstandingQty;
   Side actualSide;
   deque<Order> orders;
 };
@@ -196,19 +249,28 @@ struct Engine {
   unordered_map<char, Book> books;
   MultiProducerMultiConsumerQueue<InputOrder> q;
   bool isShutdown;
+  thread* the;
 
   void run();
+  void start();
+  void stop();
   
   void placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty);
 };
 
 
-
-Engine::Engine(Notifier& notifier) : books(), notify(notifier), isShutdown(false) {
-  books['A'] = {};
-  books['B'] = {};
-  books['C'] = {};
+void Engine::start() {
+  the = new thread([&](){this->run();});
 }
+
+void Engine::stop() {
+  isShutdown = true;
+  q.stop();
+  the->join();
+  delete the;
+}
+
+Engine::Engine(Notifier& notifier) : books(), notify(notifier), isShutdown(false) {}
 
 void Engine::run() {
   while (false == isShutdown)
@@ -227,10 +289,13 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
 
   if (true == book.orders.empty() || side == book.actualSide) {
     book.actualSide = side;
-    book.orders.push_back(Order{trader, qty, qty, side});
+    book.orders.emplace_back(trader, qty, qty, side);
     book.outstandingQty += qty;
 
-    notify.events.push({OrderPlaced, instrument, trader, qty, side});
+    if (false == notify.events.push({OrderPlaced, instrument, trader, qty, side}))
+    {
+      cout << "WARNING: events ring is full, falling back to queue!. Increse the event buffer size!.";
+    }
   }
   else
   {
@@ -247,31 +312,46 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
         book.orders.pop_front();
         book.outstandingQty -= top.remainQty;
 
-        notify.events.push({Exec, instrument, top.trader, top.qty, top.side});
+        if (false == notify.events.push({Exec, instrument, top.trader, top.qty, top.side}))
+        {
+          cout << "WARNING: events ring is full, falling back to queue!. Increse the event buffer size!.";
+        }
       }
     }
 
     if (0 == remainQty)
     {
-      notify.events.push({Exec, instrument, trader, qty, side});
+      if (false == notify.events.push({Exec, instrument, trader, qty, side}))
+      {
+        cout << "WARNING: events ring is full, falling back to queue!. Increse the event buffer size!.";
+      }
     }
     else
     {
       book.actualSide = side;
-      book.orders.push_back(Order{trader, qty, remainQty, side});
+      book.orders.emplace_back(trader, qty, remainQty, side);
       book.outstandingQty += remainQty;
-      notify.events.push({OrderPlaced, instrument, trader, qty, side});
+      if (false == notify.events.push({OrderPlaced, instrument, trader, qty, side}))
+      {
+        cout << "WARNING: events ring is full, falling back to queue!. Increse the event buffer size!.";
+      }
     }
   }
 
   // market data
   if (false == book.orders.empty())
   {
-    notify.events.push({Tick, instrument, 0, book.outstandingQty, book.actualSide});
+    if (false == notify.events.push({Tick, instrument, 0, book.outstandingQty, book.actualSide}))
+    {
+      cout << "WARNING: events ring is full, falling back to queue!. Increse the event buffer size!.";
+    }
   }
   else
   {
-    notify.events.push({Tick, instrument, 0, 0, None});
+    if (false == notify.events.push({Tick, instrument, 0, 0, None}))
+    {
+      cout << "WARNING: events ring is full, falling back to queue!. Increse the event buffer size!.";
+    }
   }
 }
 
@@ -287,49 +367,68 @@ struct Exchange {
   Engine engine;
 
   void registerClient(uint16_t id, TradingTool* client);
+
+  void start();
+  void stop();
 };
 
 struct TradingTool {
-  TradingTool(uint16_t identifier);
+  using gateway = MultiProducerMultiConsumerQueue<InputOrder>; 
 
-  SingleProducerSingleConsumerQueue<Event, 512> events;
-  MultiProducerMultiConsumerQueue<InputOrder>* q;
+  TradingTool(uint16_t identifier, function<void(TradingTool*)> i,  function<void(TradingTool*,Event)> f);
+
+  SingleProducerSingleConsumerQueue<Event> events;
+
+  gateway* q;
+
   uint16_t id;
   bool isShutdown;
+  thread* the;
+  function<void(TradingTool*,Event)>& algo;
+  function<void(TradingTool*)>& init;
 
   void connectTo(Exchange& ex);
+
+  void start();
+  void stop();
+  void wait();
 
   void run(); 
 };
 
 
 
-TradingTool::TradingTool(uint16_t identifier) : id(identifier), isShutdown(false) {}
+TradingTool::TradingTool(uint16_t identifier, function<void(TradingTool*)> i, function<void(TradingTool*,Event)> f) 
+  : id(identifier), isShutdown(false), init(i), algo(f) {}
 
 void TradingTool::connectTo(Exchange& ex) {
   q = &ex.engine.q; 
   ex.registerClient(id, this);
 }
 
+void TradingTool::start() {
+  the = new thread([&](){this->run();}); 
+}
+
+void TradingTool::stop() {
+  isShutdown = true;
+  the->join();
+  delete the;
+}
+
+void TradingTool::wait() {
+  the->join();
+  delete the;
+}
+
 void TradingTool::run() {
+  init(this);
   while (false == isShutdown)
   {
     Event event;
     if (true == events.pop(event))
     {
-      switch(event.type)
-      {
-        case EventType::Exec:
-        {
-          // handle exec
-          break;
-        }
-        case EventType::OrderPlaced:
-        {
-          // handle orderPlaced
-          break;
-        }
-      }
+      algo(this,event);
     }
     else
     {
@@ -343,7 +442,19 @@ void Exchange::registerClient(uint16_t id, TradingTool* client) {
   notif.registerClient(id, &client->events);
 }
 
-void Notifier::registerClient(uint16_t id, SingleProducerSingleConsumerQueue<Event, 512>* events) {
+void Exchange::start() 
+{
+  engine.start();
+  notif.start();
+}
+
+void Exchange::stop() 
+{
+  notif.stop();
+  engine.stop();
+}
+
+void Notifier::registerClient(uint16_t id, SingleProducerSingleConsumerQueue<Event>* events) {
   clients[id] = events;
 }
 
@@ -488,7 +599,7 @@ TEST(MatchingEngineTest, OverEatingOneSide)
   //cout << "type="<<event.type << ", instrument="<<event.instrument << ", trader=" << event.trader <<", qt=" << event.qty<<  endl;;
 }
 
-TEST(ThreadSafeQueueTest, OneThread_perf)
+TEST(MultiProducerMultiConsumerQueueTest, OneThread_perf)
 {
   MultiProducerMultiConsumerQueue<InputOrder> q; 
   InputOrder order;
@@ -508,7 +619,7 @@ TEST(ThreadSafeQueueTest, OneThread_perf)
   for (int i = 0; i < 10000; i++) q.pop(order);
 }
 
-TEST(ThreadSafeQueueTest, TwoThreads_perf)
+TEST(MultiProducerMultiConsumerQueueTest, TwoThreads_perf)
 {
   MultiProducerMultiConsumerQueue<InputOrder> q; 
   thread t1([&]() {
@@ -530,7 +641,38 @@ TEST(ThreadSafeQueueTest, TwoThreads_perf)
   t1.join();
 }
 
-TEST(LocklessQueueTest, TwoThreads_perf)
+TEST(SingleProducerSingleConsumerQueueTest, FallbackFeature)
+{
+  SingleProducerSingleConsumerQueue<Event,3> q;
+  Event event;
+
+  ASSERT_TRUE (q.push(Event{Exec, 'A', 1, 1, Sell}));
+  ASSERT_TRUE (q.push(Event{Exec, 'A', 2, 2, Sell}));
+  ASSERT_TRUE (q.push(Event{Exec, 'A', 3, 3, Sell}));
+  ASSERT_FALSE (q.push(Event{Exec, 'A', 4, 4, Sell}));
+  ASSERT_FALSE (q.push(Event{Exec, 'A', 5, 5, Sell}));
+  ASSERT_FALSE (q.push(Event{Exec, 'A', 6, 6, Sell}));
+  ASSERT_FALSE (q.push(Event{Exec, 'A', 7, 7, Sell}));
+
+  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',1,1,Sell}) == event);
+  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',2,2,Sell}) == event);
+  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',3,3,Sell}) == event);
+  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',4,4,Sell}) == event);
+  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',5,5,Sell}) == event);
+
+  ASSERT_FALSE (q.push(Event{Exec, 'A', 8, 8, Sell}));
+  ASSERT_FALSE (q.push(Event{Exec, 'A', 9, 9, Sell}));
+
+  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',6,6,Sell}) == event);
+  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',7,7,Sell}) == event);
+  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',8,8,Sell}) == event);
+  ASSERT_TRUE (true == q.pop(event) && (Event{Exec,'A',9,9,Sell}) == event);
+
+  ASSERT_FALSE (q.pop(event));
+
+}
+
+TEST(SingleProducerSingleConsumerQueueTest, TwoThreads_perf)
 {
   SingleProducerSingleConsumerQueue<Event,800> q;
   thread t1([&]() {
@@ -542,10 +684,7 @@ TEST(LocklessQueueTest, TwoThreads_perf)
       {
         this_thread::yield();
       }
-      else
-      {
-        c++;
-      }
+      c++;
     }
   });
 
@@ -567,6 +706,98 @@ TEST(LocklessQueueTest, TwoThreads_perf)
 
   t1.join();
 }
+
+TEST(IntegrationTest, OneTraderConnectedToExchange)
+{
+  bool orderAccepted = false;
+
+  auto init = [](TradingTool* me){
+    me->q->push(InputOrder{'H', me->id, 10, Sell});
+  };
+
+  auto algo = [&orderAccepted](TradingTool* me, Event e){
+    cout << "got event, type=" << e.type << endl;
+    switch(e.type)
+    {
+      case EventType::Exec:
+      {
+        break;
+      }
+      case EventType::OrderPlaced:
+      {
+        me->isShutdown = true;
+        orderAccepted = true;
+        break;
+      }
+    }
+  };
+
+  Exchange ex;
+  TradingTool trader1(1, init, algo);
+
+  trader1.connectTo(ex);
+
+  ex.start();
+  trader1.start();
+
+  trader1.wait();
+  ex.stop();
+
+  ASSERT_TRUE (orderAccepted);
+}
+
+TEST(IntegrationTest, TwoTraderConnectedToExchange)
+{
+  bool orderAccepted = false;
+
+  auto init = [](TradingTool* me){
+    cout << "sent order\n";
+    me->q->push(InputOrder{'H', me->id, 10, Sell});
+  };
+
+  auto algo = [&orderAccepted](TradingTool* me, Event e){
+    cout << "got event, type=" << e.type << endl;
+    switch(e.type)
+    {
+      case EventType::Exec:
+      {
+        cout << "exec\n";
+        break;
+      }
+      case EventType::OrderPlaced:
+      {
+        cout << "placed\n";
+        //me->isShutdown = true;
+        //orderAccepted = true;
+        break;
+      }
+    }
+  };
+
+  Exchange ex;
+  TradingTool trader1(1, init, algo);
+  TradingTool trader2(2, init, algo);
+
+  trader1.connectTo(ex);
+  //trader2.connectTo(ex);
+
+  ex.start();
+  trader1.start();
+  //trader2.start();
+
+  this_thread::sleep_for(300ms);
+
+  trader1.wait();
+  //trader2.stop();
+  ex.stop();
+
+  //ASSERT_TRUE (orderAccepted);
+}
+
+
+
+
+
 
 //========================   MAIN MAIN  ==============================
 int main(int argc, char** argv) {
