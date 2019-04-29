@@ -7,7 +7,8 @@
 using namespace std;
 
 template <typename T>
-struct MultiProducerMultiConsumerQueue {
+struct MultiProducerMultiConsumerQueue 
+{
   MultiProducerMultiConsumerQueue();
 
   void stop();
@@ -26,7 +27,8 @@ struct MultiProducerMultiConsumerQueue {
 
 
 template <typename T, int SIZE=(1<<16)>
-struct SingleProducerSingleConsumerQueue {
+struct SingleProducerSingleConsumerQueue 
+{
   SingleProducerSingleConsumerQueue(); 
 
   bool isLockFree();
@@ -116,6 +118,4 @@ bool MultiProducerMultiConsumerQueue<T>::pop(T& x)
   q.pop();
   return true;
 }
-
-
 

@@ -3,20 +3,8 @@
 #include <iostream>
 using namespace std;
 
-Notifier::Notifier() : isShutdown(false) {}
+Notifier::Notifier() {}
 
-void Notifier::start() 
-{
-  the = new thread([&](){this->run();});
-}
-
-void Notifier::stop() 
-{
-  isShutdown = true;
-  the->join();
-  delete the;
-}
-  
 void Notifier::run() 
 {
   while (false == isShutdown) {
@@ -52,20 +40,13 @@ void Notifier::registerClient(uint16_t id, SingleProducerSingleConsumerQueue<Eve
   clients[id] = events;
 }
 
-void Engine::start() 
-{
-  the = new thread([&](){this->run();});
-}
-
 void Engine::stop() 
 {
-  isShutdown = true;
   q.stop();
-  the->join();
-  delete the;
+  threadable::stop();
 }
 
-Engine::Engine(Notifier& notifier) : books(), notify(notifier), isShutdown(false) {}
+Engine::Engine(Notifier& notifier) : books(), notify(notifier) {}
 
 void Engine::run() 
 {

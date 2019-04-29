@@ -5,6 +5,7 @@
 #include <thread>
 #include <utility>
 
+#include <threadable.h>
 #include <connectors.h>
 
 using namespace std;
@@ -12,7 +13,8 @@ using namespace std;
 enum Side {Buy, Sell, None};
 enum EventType {OrderPlaced, Exec, Tick};
 
-struct InputOrder {
+struct InputOrder 
+{
   char instrument;
   uint16_t trader;
   uint16_t qty;
@@ -26,7 +28,8 @@ struct InputOrder {
   }
 };
 
-struct Order {
+struct Order 
+{
   Order(uint16_t trd, uint16_t qt, uint16_t rmQt, Side s) : trader(trd), qty(qt), remainQty(rmQt), side(s) {}
   uint16_t trader;
   uint16_t qty;
@@ -34,7 +37,8 @@ struct Order {
   Side side;
 };
 
-struct Event {
+struct Event 
+{
   EventType type;
   char instrument;
   uint16_t trader;
@@ -51,24 +55,8 @@ struct Event {
   }
 };
 
-struct Notifier {
-  Notifier();
-
-  void registerClient(uint16_t id, SingleProducerSingleConsumerQueue<Event>* events);
-
-  void start();
-
-  void stop();
-
-  void run();
-
-  SingleProducerSingleConsumerQueue<Event> events;
-  unordered_map<uint16_t, SingleProducerSingleConsumerQueue<Event>*> clients;
-  bool isShutdown;
-  thread* the;
-};
-
-struct Book {
+struct Book 
+{
   Book() : actualSide(None), outstandingQty(0) {}
 
   uint32_t outstandingQty;
@@ -76,26 +64,36 @@ struct Book {
   deque<Order> orders;
 };
 
-struct Engine {
+struct Notifier : public threadable
+{
+  Notifier();
+
+  void registerClient(uint16_t id, SingleProducerSingleConsumerQueue<Event>* events);
+
+  virtual void run();
+
+  SingleProducerSingleConsumerQueue<Event> events;
+  unordered_map<uint16_t, SingleProducerSingleConsumerQueue<Event>*> clients;
+};
+
+struct Engine : public threadable 
+{
   Engine(Notifier& notifier);
 
   void placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty);
 
-  void run();
-
-  void start();
-
   void stop();
+
+  virtual void run();
 
   Notifier& notify;
   unordered_map<char, Book> books;
   MultiProducerMultiConsumerQueue<InputOrder> q;
-  bool isShutdown;
-  thread* the;
 };
 
 struct TradingTool;
-struct Exchange {
+struct Exchange 
+{
   Exchange() : engine(notif) {}
 
   void registerClient(uint16_t id, TradingTool* client);
