@@ -16,7 +16,11 @@ void Notifier::run()
         case EventType::Exec:
         case EventType::OrderPlaced:
         {
-          clients[event.trader]->push(event);
+          if (false == clients[event.trader]->push(event))
+          {
+            cout << "NOTIFIER WARNING: events ring is full!. Increse the clients event buffer size!.\n";
+            clients[event.trader]->forcePush(event);
+          }
           break;
         }
         case EventType::Tick:
@@ -75,7 +79,8 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
 
     if (false == notify.events.push({OrderPlaced, instrument, trader, qty, side}))
     {
-      cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
+      cout << "ENGINE WARNING: events ring is full!. Increse the event buffer size!.\n";
+      notify.events.forcePush({OrderPlaced, instrument, trader, qty, side});
     }
   }
   else
@@ -96,7 +101,8 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
 
         if (false == notify.events.push({Exec, instrument, top.trader, top.qty, book.actualSide}))
         {
-          cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
+          cout << "ENGINE WARNING: events ring is full!. Increse the event buffer size!.\n";
+          notify.events.forcePush({Exec, instrument, top.trader, top.qty, book.actualSide});
         }
       }
     }
@@ -105,7 +111,8 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
     {
       if (false == notify.events.push({Exec, instrument, trader, qty, side}))
       {
-        cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
+        cout << "ENGINE WARNING: events ring is full!. Increse the event buffer size!.\n";
+        notify.events.forcePush({Exec, instrument, trader, qty, side});
       }
     }
     else
@@ -116,7 +123,8 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
       book.openedOrdersQty += qty;
       if (false == notify.events.push({OrderPlaced, instrument, trader, qty, side}))
       {
-        cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
+        cout << "ENGINE WARNING: events ring is full!. Increse the event buffer size!.\n";
+        notify.events.forcePush({OrderPlaced, instrument, trader, qty, side});
       }
     }
   }
@@ -126,14 +134,16 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
   {
     if (false == notify.events.push({Tick, instrument, 0, book.outstandingQty, book.actualSide}))
     {
-      cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
+      cout << "ENGINE WARNING: events ring is full!. Increse the event buffer size!.\n";
+      notify.events.forcePush({Tick, instrument, 0, book.outstandingQty, book.actualSide});
     }
   }
   else
   {
     if (false == notify.events.push({Tick, instrument, 0, 0, None}))
     {
-      cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
+      cout << "ENGINE WARNING: events ring is full!. Increse the event buffer size!.\n";
+      notify.events.forcePush({Tick, instrument, 0, 0, None});
     }
   }
 }

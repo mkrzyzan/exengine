@@ -4,6 +4,7 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
+#include <thread>
 using namespace std;
 
 template <typename T>
@@ -33,6 +34,8 @@ struct SingleProducerSingleConsumerQueue
 
   bool isLockFree();
 
+  void forcePush(const T& x);
+
   bool push(const T& x);
 
   bool pop(T& x);
@@ -50,6 +53,15 @@ template <typename T, int SIZE>
 bool SingleProducerSingleConsumerQueue<T,SIZE>::isLockFree() 
 {
   return head.is_lock_free() && tail.is_lock_free();
+}
+
+template <typename T, int SIZE>
+void SingleProducerSingleConsumerQueue<T,SIZE>::forcePush(const T& x) 
+{
+  while (false == push(x))
+  {
+    this_thread::yield(); 
+  }
 }
 
 template <typename T, int SIZE>
