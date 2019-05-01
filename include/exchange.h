@@ -13,6 +13,13 @@ using namespace std;
 enum Side {Buy, Sell, None};
 enum EventType {OrderPlaced, Exec, Tick};
 
+struct InternalOrder 
+{
+  InternalOrder(uint16_t trd, uint16_t qt) : trader(trd), qty(qt) {}
+  uint16_t trader;
+  uint16_t qty;
+};
+
 struct InputOrder 
 {
   char instrument;
@@ -26,15 +33,6 @@ struct InputOrder
            qty == rhs.qty && 
            side == rhs.side;
   }
-};
-
-struct Order 
-{
-  Order(uint16_t trd, uint16_t qt, uint16_t rmQt, Side s) : trader(trd), qty(qt), remainQty(rmQt), side(s) {}
-  uint16_t trader;
-  uint16_t qty;
-  uint16_t remainQty;
-  Side side;
 };
 
 struct Event 
@@ -57,11 +55,11 @@ struct Event
 
 struct Book 
 {
-  Book() : actualSide(None), outstandingQty(0) {}
+  Book() : actualSide(None), outstandingQty(0), openedOrdersQty(0) {}
 
-  uint32_t outstandingQty;
+  uint32_t outstandingQty, openedOrdersQty;
   Side actualSide;
-  deque<Order> orders;
+  deque<InternalOrder> orders;
 };
 
 struct Notifier : public threadable

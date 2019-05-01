@@ -95,8 +95,11 @@ Defined in file ```connectors.h```. Regular mutex synchronized queue
 # Testing
 There are three different types of tests defined in ```testsuite.cpp```.
 1. Unittests (one compnent): ```MatchingEngineTest```
+```./testsuite --gtest_filter=MatchingEngineTest*```
 2. Performace: ```MultiProducerMultiConsumerQueueTest```, ```MultiProducerMultiConsumerQueueTest```
+```./testsuite --gtest_filter=Multi*:Single*```
 3. integration tests (all components put together, simulate real system): ```IntegrationTest ```
+```./testsuite --gtest_filter=Integration*```
 
 Google test framework has been used in this project.
 For running tests, I suggest run the ```MatchingEngineTest``` and later try to play with the Performance and IntegrationTests since they can need to be tuned a little bit.

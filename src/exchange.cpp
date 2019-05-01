@@ -67,8 +67,9 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
 
   if (true == book.orders.empty() || side == book.actualSide) {
     book.actualSide = side;
-    book.orders.emplace_back(trader, qty, qty, side);
+    book.orders.emplace_back(trader, qty);
     book.outstandingQty += qty;
+    book.openedOrdersQty += qty;
 
     if (false == notify.events.push({OrderPlaced, instrument, trader, qty, side}))
     {
@@ -78,19 +79,20 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
   else
   {
     while (false == book.orders.empty() && 0 != remainQty) {
-      Order& top = book.orders.front();
-      if (top.remainQty > remainQty)
+      InternalOrder& top = book.orders.front();
+      uint32_t topRemainQty = (top.qty + book.outstandingQty) - book.openedOrdersQty;
+      if (topRemainQty > remainQty)
       {
-        top.remainQty -= remainQty;
         book.outstandingQty -= remainQty;
         remainQty = 0;
       }
       else {
-        remainQty -= top.remainQty;
+        remainQty -= topRemainQty;
         book.orders.pop_front();
-        book.outstandingQty -= top.remainQty;
+        book.outstandingQty -= topRemainQty;
+        book.openedOrdersQty -= top.qty;
 
-        if (false == notify.events.push({Exec, instrument, top.trader, top.qty, top.side}))
+        if (false == notify.events.push({Exec, instrument, top.trader, top.qty, book.actualSide}))
         {
           cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
         }
@@ -107,8 +109,9 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
     else
     {
       book.actualSide = side;
-      book.orders.emplace_back(trader, qty, remainQty, side);
+      book.orders.emplace_back(trader, qty);
       book.outstandingQty += remainQty;
+      book.openedOrdersQty += qty;
       if (false == notify.events.push({OrderPlaced, instrument, trader, qty, side}))
       {
         cout << "ERROR: events ring is full, event drop!. Increse the event buffer size!.";
