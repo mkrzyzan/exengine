@@ -54,8 +54,10 @@ void Engine::run()
   {
     // blocking call
     InputOrder newOrder;
-    q.pop(newOrder); 
-    placeOrder(newOrder.instrument, newOrder.side, newOrder.trader, newOrder.qty);
+    if (true == q.pop(newOrder)) 
+    {
+      placeOrder(newOrder.instrument, newOrder.side, newOrder.trader, newOrder.qty);
+    }
   }
 }
 
