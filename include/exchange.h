@@ -53,13 +53,38 @@ struct Event
   }
 };
 
-struct Book 
+//=================== TRAITS ================
+struct BuySideTrait
 {
-  Book() : actualSide(None), outstandingQty(0), openedOrdersQty(0) {}
+  static bool nonCross(const Book& book, int price) {return ask <= price;}
+  static bool nonCrossOrInSpread(const Book& book, int price) {return bid <= price;}
+};
+
+struct SellSideTrait
+{
+  static bool nonCross(const Book& book, int price) {return bid >= price;}
+  static bool nonCrossOrInSpread(const Book& book, int price) {return ask >= price;}
+};
+/
+//=================== TRAITS ================
+
+
+struct Level 
+{
+  Limit() : outstandingQty(0), openedOrdersQty(0) {}
 
   uint32_t outstandingQty, openedOrdersQty;
-  Side actualSide;
   deque<InternalOrder> orders;
+};
+
+struct Book 
+{
+  Book() : bidMax(0), askMax(0) {}
+
+  int bidMax, askMax;
+
+  map<int, Level, less<int>> bidLevels;
+  map<int, Level, greater<int>> askLevels;
 };
 
 struct Notifier : public threadable

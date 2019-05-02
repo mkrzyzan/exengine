@@ -65,69 +65,111 @@ void Engine::run()
   }
 }
 
-void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty) 
+
+template <typename SideTraits>
+void Engine::placeOrder(char instrument, int price, uint16_t trader, uint16_t qty) 
 {
   Book& book = books[instrument];
   uint16_t remainQty = qty;
-
-
-  if (true == book.orders.empty() || side == book.actualSide) {
-    book.actualSide = side;
-    book.orders.emplace_back(trader, qty);
-    book.outstandingQty += qty;
-    book.openedOrdersQty += qty;
-
-    if (false == notify.events.push({OrderPlaced, instrument, trader, qty, side}))
+  
+  if (true == SideTrait::nonCrossOrInSpread(book, price)
+  {
+    if (false == SideTrait::nonCross(book, price)
     {
-      cout << "ENGINE WARNING: events ring is full!. Increse the event buffer size!.\n";
-      notify.events.forcePush({OrderPlaced, instrument, trader, qty, side});
+      int& nonCrossBound = SideTrait::nonCrossBound();
+      nonCrossBound = price;
     }
+
+    //find limit
+    // Y - add order to limit
+    // N - create limit, add order to limit
+    auto& levels = SideTrait::GetUncrossedLevels(book);
+
+    auto it = evels.lower_bound(price);
+
+    if (it->first != price)
+    {
+      //create limit
+      it = levels.emplace_hint(it, price);
+    }
+
+    it->second.orders.emplace_back(trader, qty);
+    it->second.orders.outstandingQty += qty;
+    it->second.orders.openedOrdersQty += qty;
+
   }
   else
   {
-    while (false == book.orders.empty() && 0 != remainQty) {
-      InternalOrder& top = book.orders.front();
-      uint32_t topRemainQty = (top.qty + book.outstandingQty) - book.openedOrdersQty;
-      if (topRemainQty > remainQty)
-      {
-        book.outstandingQty -= remainQty;
-        remainQty = 0;
-      }
-      else {
-        remainQty -= topRemainQty;
-        book.orders.pop_front();
-        book.outstandingQty -= topRemainQty;
-        book.openedOrdersQty -= top.qty;
+    // crossed
+    auto& levels = SideTrait::GetCrossedLevels(book);
 
-        if (false == notify.events.push({Exec, instrument, top.trader, top.qty, book.actualSide}))
+    // walk through levels
+    auto it = levels.begin();
+    while (it != levels.end() && 0 != remainQty)
+    {
+      auto& level = it->second;
+      auto& levelPrice = it->first;
+
+      // walk through orders @ level
+      while (false == level.orders.empty() && 0 != remainQty) 
+      {
+        InternalOrder& top = level.orders.front();
+        uint32_t topRemainQty = (top.qty + level.outstandingQty) - level.openedOrdersQty;
+        if (topRemainQty > remainQty)
         {
-          cout << "ENGINE WARNING: events ring is full!. Increse the event buffer size!.\n";
-          notify.events.forcePush({Exec, instrument, top.trader, top.qty, book.actualSide});
+          level.outstandingQty -= remainQty;
+          remainQty = 0;
+        }
+        else 
+        {
+          remainQty -= topRemainQty;
+          level.orders.pop_front();
+          level.outstandingQty -= topRemainQty;
+          level.openedOrdersQty -= top.qty;
+
+          notify.events.forcePush({Exec, instrument, top.trader, top.qty, level.actualSide});
         }
       }
+      
+      // if all orders from level have got eaten, erase the level
+      if (0 != remainQty)
+      {
+        it = levels.erase(it);
+      }
     }
+
 
     if (0 == remainQty)
     {
-      if (false == notify.events.push({Exec, instrument, trader, qty, side}))
-      {
-        cout << "ENGINE WARNING: events ring is full!. Increse the event buffer size!.\n";
-        notify.events.forcePush({Exec, instrument, trader, qty, side});
-      }
+      notify.events.forcePush({Exec, instrument, trader, qty, side});
+
+      // update maxBid, minAsk
+      SideTrait::nonCrossOrSpreadBound() = levelPrice;
+
     }
     else
     {
-      book.actualSide = side;
-      book.orders.emplace_back(trader, qty);
-      book.outstandingQty += remainQty;
-      book.openedOrdersQty += qty;
-      if (false == notify.events.push({OrderPlaced, instrument, trader, qty, side}))
-      {
-        cout << "ENGINE WARNING: events ring is full!. Increse the event buffer size!.\n";
-        notify.events.forcePush({OrderPlaced, instrument, trader, qty, side});
-      }
+      level.actualSide = side;
+      level.orders.emplace_back(trader, qty);
+      level.outstandingQty += remainQty;
+      level.openedOrdersQty += qty;
+      notify.events.forcePush({OrderPlaced, instrument, trader, qty, side});
+
+      // update maxBid, minAsk
+      SideTrait::nonCrossOrSpreadBound() = 0;
+      SideTrait::nonCrossBound() = levelPrice;
     }
   }
+}
+
+void Engine::placeOrder(char instrument, Side side, int price,  uint16_t trader, uint16_t qty) 
+{
+  if (Sell == side)
+    placeOrder<SellSideTrait>(instrument, price, trader, qty);
+  else
+    placeOrder<BuySideTrait>(instrument, price, trader, qty);
+}
+
 
   // market data
   if (false == book.orders.empty())
