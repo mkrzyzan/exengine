@@ -67,6 +67,8 @@ void Engine::run()
 
 void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty) 
 {
+  if (0 == qty || None == side) return;
+
   Book& book = books[instrument];
   uint16_t remainQty = qty;
 

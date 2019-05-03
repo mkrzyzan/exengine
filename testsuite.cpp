@@ -200,6 +200,42 @@ TEST(MatchingEngineTest, OrderSlicing)
 }
 
 
+class MatchingEnginePerformance : public testing::TestWithParam<uint16_t> {};
+
+TEST_P(MatchingEnginePerformance, EventsBurst)
+{
+  Exchange ex;
+  Notifier& notif = ex.notif;
+  Engine& eng = ex.engine;
+  Event event;
+
+  //  (100 * 3 * GetParam()) + 2 events
+  for (int n = 0; n < 100; n++)
+  {
+    uint32_t qty = 0;
+    for (int i = 0; i < GetParam(); i++)
+    {
+      eng.placeOrder('H', Buy, 1, 1);
+      ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 1, 1, Buy}) == event);
+      qty += 1;
+      ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, qty, Buy}) == event);
+    }
+
+    eng.placeOrder('H', Sell, 2, GetParam());
+    for (int i = 0; i < GetParam(); i++)
+    {
+      ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 1, 1, Buy}) == event);
+    }
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 2, GetParam(), Sell}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick, 'H', 0, 0, None}) == event);
+    ASSERT_TRUE (false == notif.events.pop(event));
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(Perfo, MatchingEnginePerformance, testing::Values(1<<1, 1<<3, 1<<5, 1<<7, 1<<9, 1<<11, 1<<13, 1<<15, (1<<16)-2),
+                        testing::PrintToStringParamName());
+
+
 TEST(MultiProducerMultiConsumerQueueTest, OneThread_perf)
 {
   MultiProducerMultiConsumerQueue<InputOrder> q; 
