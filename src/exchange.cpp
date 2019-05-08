@@ -66,18 +66,17 @@ void Engine::run()
 }
 
 
-template <typename SideTraits>
+template <typename SideTrait>
 void Engine::placeOrder(char instrument, int price, uint16_t trader, uint16_t qty) 
 {
   Book& book = books[instrument];
   uint16_t remainQty = qty;
   
-  if (true == SideTrait::nonCrossOrInSpread(book, price)
+  if (true == SideTrait::nonCrossOrInSpread(book, price))
   {
-    if (false == SideTrait::nonCross(book, price)
+    if (false == SideTrait::nonCross(book, price))
     {
-      int& nonCrossBound = SideTrait::nonCrossBound();
-      nonCrossBound = price;
+      SideTrait::nonCrossBound(book) = price;
     }
 
     //find limit
@@ -85,17 +84,20 @@ void Engine::placeOrder(char instrument, int price, uint16_t trader, uint16_t qt
     // N - create limit, add order to limit
     auto& levels = SideTrait::GetUncrossedLevels(book);
 
-    auto it = evels.lower_bound(price);
+    auto it = levels.lower_bound(price);
 
     if (it->first != price)
     {
       //create limit
-      it = levels.emplace_hint(it, price);
+      it = levels.emplace_hint(it, price, Level());
     }
 
     it->second.orders.emplace_back(trader, qty);
-    it->second.orders.outstandingQty += qty;
-    it->second.orders.openedOrdersQty += qty;
+    it->second.outstandingQty += qty;
+    it->second.openedOrdersQty += qty;
+
+
+    notify.events.forcePush({OrderPlaced, instrument, trader, qty, SideTrait::side});
 
   }
   else
@@ -104,11 +106,12 @@ void Engine::placeOrder(char instrument, int price, uint16_t trader, uint16_t qt
     auto& levels = SideTrait::GetCrossedLevels(book);
 
     // walk through levels
+    int levelPrice = 0;
     auto it = levels.begin();
     while (it != levels.end() && 0 != remainQty)
     {
       auto& level = it->second;
-      auto& levelPrice = it->first;
+      levelPrice = it->first;
 
       // walk through orders @ level
       while (false == level.orders.empty() && 0 != remainQty) 
@@ -127,12 +130,12 @@ void Engine::placeOrder(char instrument, int price, uint16_t trader, uint16_t qt
           level.outstandingQty -= topRemainQty;
           level.openedOrdersQty -= top.qty;
 
-          notify.events.forcePush({Exec, instrument, top.trader, top.qty, level.actualSide});
+          notify.events.forcePush({Exec, instrument, top.trader, top.qty, SideTrait::otherSide});
         }
       }
       
       // if all orders from level have got eaten, erase the level
-      if (0 != remainQty)
+      if (true == level.orders.empty())
       {
         it = levels.erase(it);
       }
@@ -141,36 +144,66 @@ void Engine::placeOrder(char instrument, int price, uint16_t trader, uint16_t qt
 
     if (0 == remainQty)
     {
-      notify.events.forcePush({Exec, instrument, trader, qty, side});
+      notify.events.forcePush({Exec, instrument, trader, qty, SideTrait::side});
 
       // update maxBid, minAsk
-      SideTrait::nonCrossOrSpreadBound() = levelPrice;
+      SideTrait::nonCrossOrSpreadBound(book) = levelPrice;
 
     }
     else
     {
-      level.actualSide = side;
+      auto& levels = SideTrait::GetUncrossedLevels(book);
+
+      // level might not exists yet, necessary to create it
+      auto firstLevel = levels.begin();
+      if (firstLevel == levels.end())
+      {
+        firstLevel = levels.emplace_hint(firstLevel, price, Level());
+      }
+      auto& level = firstLevel->second;
+
       level.orders.emplace_back(trader, qty);
       level.outstandingQty += remainQty;
       level.openedOrdersQty += qty;
-      notify.events.forcePush({OrderPlaced, instrument, trader, qty, side});
+      notify.events.forcePush({OrderPlaced, instrument, trader, qty, SideTrait::side});
 
       // update maxBid, minAsk
-      SideTrait::nonCrossOrSpreadBound() = 0;
-      SideTrait::nonCrossBound() = levelPrice;
+      //SideTrait::nonCrossOrSpreadBound(book) = 0;
+      SideTrait::resetNonCrossOrSpreadBound(book);
+      SideTrait::nonCrossBound(book) = levelPrice;
+    }
+
+
+    // update BID and ASK
+    if (true == book.bidLevels.empty())
+    {
+      book.bid = numeric_limits<int>::min();
+    }
+    
+    if (true == book.askLevels.empty())
+    {
+      book.ask = numeric_limits<int>::max();
     }
   }
+}
+
+void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty) 
+{
+  placeOrder(instrument, side, 666, trader, qty);
 }
 
 void Engine::placeOrder(char instrument, Side side, int price,  uint16_t trader, uint16_t qty) 
 {
   if (Sell == side)
+  {
     placeOrder<SellSideTrait>(instrument, price, trader, qty);
+  }
   else
+  {
     placeOrder<BuySideTrait>(instrument, price, trader, qty);
+  }
 }
-
-
+  /*
   // market data
   if (false == book.orders.empty())
   {
@@ -188,7 +221,8 @@ void Engine::placeOrder(char instrument, Side side, int price,  uint16_t trader,
       notify.events.forcePush({Tick, instrument, 0, 0, None});
     }
   }
-}
+  */
+//}
 
 
 void Exchange::registerClient(uint16_t id, TradingTool* client) 
