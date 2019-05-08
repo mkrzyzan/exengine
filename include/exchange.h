@@ -66,44 +66,41 @@ struct Level
 
 struct Book 
 {
-  Book() : bid(numeric_limits<int>::min()), ask(numeric_limits<int>::max()) {}
+  Book() {}
 
-  int bid, ask;
-
-  map<int, Level, less<int>> bidLevels;
-  map<int, Level, greater<int>> askLevels;
+  map<int, Level, greater<int>> bidLevels;
+  map<int, Level, less<int>> askLevels;
 };
 
 //=================== TRAITS ================
-struct BuySideTrait
+struct SideTrait
 {
-  static bool nonCross(const Book& book, int price) {return book.bid >= price;}
-  static bool nonCrossOrInSpread(const Book& book, int price) {return book.ask > price;}
+  static int GetAsk(const Book& book) {
+    return (true == book.askLevels.empty()) ? numeric_limits<int>::max() : book.askLevels.begin()->first;
+  }
+
+  static int GetBid(const Book& book) {
+    return (true == book.bidLevels.empty()) ? numeric_limits<int>::min() : book.bidLevels.begin()->first;
+  }
+};
+
+struct BuySideTrait : SideTrait
+{
+  static bool liquidityProvider(const Book& book, int price) {return GetAsk(book) > price;}
 
   static auto& GetCrossedLevels(Book& book) {return book.askLevels;}
   static auto& GetUncrossedLevels(Book& book) {return book.bidLevels;}
-
-  static int& nonCrossBound(Book& book) {return book.bid;}
-
-  static int& nonCrossOrSpreadBound(Book& book) {return book.ask;}
-  static void resetNonCrossOrSpreadBound(Book& book) {book.ask = numeric_limits<int>::max();}
 
   static const Side side = Buy;
   static const Side otherSide = Sell;
 };
 
-struct SellSideTrait
+struct SellSideTrait : SideTrait
 {
-  static bool nonCross(const Book& book, int price) {return book.ask <= price;}
-  static bool nonCrossOrInSpread(const Book& book, int price) {return book.bid < price;}
+  static bool liquidityProvider(const Book& book, int price) {return GetBid(book) < price;}
 
   static auto& GetCrossedLevels(Book& book) {return book.bidLevels;}
   static auto& GetUncrossedLevels(Book& book) {return book.askLevels;}
-
-  static int& nonCrossBound(Book& book) {return book.ask;}
-
-  static int& nonCrossOrSpreadBound(Book& book) {return book.bid;}
-  static void resetNonCrossOrSpreadBound(Book& book) {book.bid = numeric_limits<int>::min();}
 
   static const Side side = Sell;
   static const Side otherSide = Buy;

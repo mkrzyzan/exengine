@@ -72,13 +72,8 @@ void Engine::placeOrder(char instrument, int price, uint16_t trader, uint16_t qt
   Book& book = books[instrument];
   uint16_t remainQty = qty;
   
-  if (true == SideTrait::nonCrossOrInSpread(book, price))
+  if (true == SideTrait::liquidityProvider(book, price))
   {
-    if (false == SideTrait::nonCross(book, price))
-    {
-      SideTrait::nonCrossBound(book) = price;
-    }
-
     //find limit
     // Y - add order to limit
     // N - create limit, add order to limit
@@ -108,7 +103,7 @@ void Engine::placeOrder(char instrument, int price, uint16_t trader, uint16_t qt
     // walk through levels
     int levelPrice = 0;
     auto it = levels.begin();
-    while (it != levels.end() && 0 != remainQty)
+    while (it != levels.end() && 0 != remainQty && false==SideTrait::liquidityProvider(book, price))
     {
       auto& level = it->second;
       levelPrice = it->first;
@@ -145,10 +140,6 @@ void Engine::placeOrder(char instrument, int price, uint16_t trader, uint16_t qt
     if (0 == remainQty)
     {
       notify.events.forcePush({Exec, instrument, trader, qty, SideTrait::side});
-
-      // update maxBid, minAsk
-      SideTrait::nonCrossOrSpreadBound(book) = levelPrice;
-
     }
     else
     {
@@ -156,10 +147,7 @@ void Engine::placeOrder(char instrument, int price, uint16_t trader, uint16_t qt
 
       // level might not exists yet, necessary to create it
       auto firstLevel = levels.begin();
-      if (firstLevel == levels.end())
-      {
-        firstLevel = levels.emplace_hint(firstLevel, price, Level());
-      }
+      firstLevel = levels.emplace_hint(firstLevel, price, Level());
       auto& level = firstLevel->second;
 
       level.orders.emplace_back(trader, qty);
@@ -167,23 +155,8 @@ void Engine::placeOrder(char instrument, int price, uint16_t trader, uint16_t qt
       level.openedOrdersQty += qty;
       notify.events.forcePush({OrderPlaced, instrument, trader, qty, SideTrait::side});
 
-      // update maxBid, minAsk
-      //SideTrait::nonCrossOrSpreadBound(book) = 0;
-      SideTrait::resetNonCrossOrSpreadBound(book);
-      SideTrait::nonCrossBound(book) = levelPrice;
     }
 
-
-    // update BID and ASK
-    if (true == book.bidLevels.empty())
-    {
-      book.bid = numeric_limits<int>::min();
-    }
-    
-    if (true == book.askLevels.empty())
-    {
-      book.ask = numeric_limits<int>::max();
-    }
   }
 }
 

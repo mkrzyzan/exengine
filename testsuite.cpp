@@ -12,6 +12,45 @@
 #include "gtest/gtest.h"
 using namespace std;
 
+TEST(MatchingEngineTest, PriceLevelsBasicTest)
+{
+  Exchange ex;
+  Notifier& notif = ex.notif;
+  Engine& eng = ex.engine;
+  Event event;
+
+  // liquidity provider
+  eng.placeOrder('A', Buy, 1000, 1, 100);
+  eng.placeOrder('A', Buy, 1000, 1, 200);
+  eng.placeOrder('A', Buy, 1001, 1, 101);
+  eng.placeOrder('A', Buy, 1001, 1, 201);
+  eng.placeOrder('A', Buy, 1002, 1, 102);
+  eng.placeOrder('A', Buy, 1002, 1, 202);
+
+  // liquidity provider
+  eng.placeOrder('A', Sell, 1008, 1, 108);
+  eng.placeOrder('A', Sell, 1008, 1, 208);
+  eng.placeOrder('A', Sell, 1009, 1, 109);
+  eng.placeOrder('A', Sell, 1009, 1, 209);
+
+  // liquidity taker
+  eng.placeOrder('A', Sell, 1002, 1, 2);
+  eng.placeOrder('A', Sell, 1002, 1, 2);
+
+  // liquidity take & provider
+  eng.placeOrder('A', Sell, 1002, 1, 400);
+
+  // all liquidity taker & provider
+  eng.placeOrder('A', Sell, 1000, 1, 1000);
+
+  // all liquidity taker & provider
+  eng.placeOrder('A', Buy, 1009, 1, 2000);
+
+  // all liquidity taker 
+  eng.placeOrder('A', Sell, 1008, 1, 868);
+
+}
+
 TEST(MatchingEngineTest, FourOrders)
 {
   Exchange ex;
