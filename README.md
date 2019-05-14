@@ -1,4 +1,4 @@
-# exengine (Marcin Krzyzanowski)
+# exengine
 simplistic exchange engine
 
 # build
