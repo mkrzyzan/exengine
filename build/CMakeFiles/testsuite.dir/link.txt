@@ -1,0 +1,1 @@
+/usr/bin/c++  -std=c++14 -O3 -march=sandybridge -rdynamic -Wl,--dependency-file=CMakeFiles/testsuite.dir/link.d CMakeFiles/testsuite.dir/testsuite.cpp.o CMakeFiles/testsuite.dir/src/exchange.cpp.o CMakeFiles/testsuite.dir/src/tradingtool.cpp.o CMakeFiles/testsuite.dir/src/threadable.cpp.o -o testsuite  lib/libgtest.a lib/libgtest_main.a lib/libgtest.a

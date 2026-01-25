@@ -60,12 +60,12 @@ void Engine::run()
     InputOrder newOrder;
     if (true == q.pop(newOrder)) 
     {
-      placeOrder(newOrder.instrument, newOrder.side, newOrder.trader, newOrder.qty);
+      placeOrder(newOrder.instrument, newOrder.side, newOrder.trader, newOrder.qty, newOrder.level);
     }
   }
 }
 
-void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty) 
+void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty, uint16_t level) 
 {
   if (0 == qty || None == side) return;
 
@@ -75,7 +75,7 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
 
   if (true == book.orders.empty() || side == book.actualSide) {
     book.actualSide = side;
-    book.orders.emplace_back(trader, qty);
+    book.orders.emplace_back(trader, qty, level);
     book.outstandingQty += qty;
     book.openedOrdersQty += qty;
 
@@ -120,7 +120,7 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
     else
     {
       book.actualSide = side;
-      book.orders.emplace_back(trader, qty);
+      book.orders.emplace_back(trader, qty, level);
       book.outstandingQty += remainQty;
       book.openedOrdersQty += qty;
       if (false == notify.events.push({OrderPlaced, instrument, trader, qty, side}))

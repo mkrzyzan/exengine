@@ -15,9 +15,10 @@ enum EventType {OrderPlaced, Exec, Tick};
 
 struct InternalOrder 
 {
-  InternalOrder(uint16_t trd, uint16_t qt) : trader(trd), qty(qt) {}
+  InternalOrder(uint16_t trd, uint16_t qt, uint16_t lvl) : trader(trd), qty(qt), level(lvl) {}
   uint16_t trader;
   uint16_t qty;
+  uint16_t level;
 };
 
 struct InputOrder 
@@ -26,12 +27,14 @@ struct InputOrder
   uint16_t trader;
   uint16_t qty;
   Side side;
+  uint16_t level;
   bool operator==(const InputOrder& rhs)
   { 
     return instrument == rhs.instrument &&
            trader == rhs.trader &&
            qty == rhs.qty && 
-           side == rhs.side;
+           side == rhs.side &&
+           level == rhs.level;
   }
 };
 
@@ -78,7 +81,7 @@ struct Engine : public threadable
 {
   Engine(Notifier& notifier);
 
-  void placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty);
+  void placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty, uint16_t level);
 
   void stop();
 
