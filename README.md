@@ -35,8 +35,10 @@ struct InputOrder
   uint16_t trader;
   uint16_t qty;
   Side side;
+  uint16_t level;
  }
  ```
+ The `level` field represents the priority level of the order and can be used for priority-based order processing.
  Next, the order is taken by ```PlaceOrder``` method and matched against the appropriate order book. This process generates several types of Events:
 1. ```OrderPlaced``` - indicates that order been placed into order book and is still opened.
 2. ```Exec``` - means that order has been fully matched with some opposite order.
