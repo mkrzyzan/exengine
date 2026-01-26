@@ -540,7 +540,7 @@ TEST(MatchingEngineTest, OrderPriceParameter)
   Engine& eng = ex.engine;
   Event event;
 
-  // Test that price parameter is accepted and orders are processed correctly
+  // Test price-time priority matching
   eng.placeOrder('L', Buy, 1, 100, 50);
   eng.placeOrder('L', Buy, 2, 200, 75);
   eng.placeOrder('L', Sell, 3, 150, 50);
@@ -550,10 +550,12 @@ TEST(MatchingEngineTest, OrderPriceParameter)
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'L',0,100,Buy}) == event);
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'L',2,200,Buy}) == event);
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'L',0,300,Buy}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'L',1,100,Buy}) == event);
+  // Sell @50 matches with best buy (trader 2 @75) for 150 qty
+  // Trader 2's order is partially filled (150 of 200), so only the sell generates Exec
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'L',3,150,Sell}) == event);
+  // Remaining: trader 2 has 50 @75, trader 1 has 100 @50 = 150 total
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'L',0,150,Buy}) == event);
-  ASSERT_TRUE (false == notif.events.pop(event));
+  ASSERT_FALSE (notif.events.pop(event));
 }
 
 

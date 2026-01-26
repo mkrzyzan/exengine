@@ -111,7 +111,9 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
       }
     } else if (remainQty > 0) {
       // Partial or no execution - just place in book
+      // When placing, use remainQty for the current qty, but keep track of original order qty
       book.buyOrders[price].emplace_back(trader, qty, price);
+      book.buyOrders[price].back().qty = remainQty;  // Update qty to remaining amount
       if (false == notify.events.push({OrderPlaced, instrument, trader, qty, Buy})) {
         cout << "ENGINE WARNING: events ring is full!. Increse the event buffer size!.\n";
         notify.events.forcePush({OrderPlaced, instrument, trader, qty, Buy});
@@ -154,7 +156,9 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
       }
     } else if (remainQty > 0) {
       // Partial or no execution - just place in book
+      // When placing, use remainQty for the current qty, but keep track of original order qty
       book.sellOrders[price].emplace_back(trader, qty, price);
+      book.sellOrders[price].back().qty = remainQty;  // Update qty to remaining amount
       if (false == notify.events.push({OrderPlaced, instrument, trader, qty, Sell})) {
         cout << "ENGINE WARNING: events ring is full!. Increse the event buffer size!.\n";
         notify.events.forcePush({OrderPlaced, instrument, trader, qty, Sell});
