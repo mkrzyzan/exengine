@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <map>
 #include <deque>
 #include <thread>
 #include <utility>
@@ -15,9 +16,11 @@ enum EventType {OrderPlaced, Exec, Tick};
 
 struct InternalOrder 
 {
-  InternalOrder(uint16_t trd, uint16_t qt) : trader(trd), qty(qt) {}
+  InternalOrder(uint16_t trd, uint16_t qt, uint32_t pr) : trader(trd), origQty(qt), qty(qt), price(pr) {}
   uint16_t trader;
-  uint16_t qty;
+  uint16_t origQty;  // original order quantity
+  uint16_t qty;      // remaining quantity
+  uint32_t price;
 };
 
 struct InputOrder 
@@ -26,12 +29,14 @@ struct InputOrder
   uint16_t trader;
   uint16_t qty;
   Side side;
+  uint32_t price;
   bool operator==(const InputOrder& rhs)
   { 
     return instrument == rhs.instrument &&
            trader == rhs.trader &&
            qty == rhs.qty && 
-           side == rhs.side;
+           side == rhs.side &&
+           price == rhs.price;
   }
 };
 
@@ -55,11 +60,10 @@ struct Event
 
 struct Book 
 {
-  Book() : actualSide(None), outstandingQty(0), openedOrdersQty(0) {}
+  Book() {}
 
-  uint32_t outstandingQty, openedOrdersQty;
-  Side actualSide;
-  deque<InternalOrder> orders;
+  map<uint32_t, deque<InternalOrder>, greater<uint32_t>> buyOrders;  // descending price for buys
+  map<uint32_t, deque<InternalOrder>> sellOrders;  // ascending price for sells
 };
 
 struct Notifier : public threadable
@@ -78,7 +82,7 @@ struct Engine : public threadable
 {
   Engine(Notifier& notifier);
 
-  void placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty);
+  void placeOrder(char instrument, Side side, uint16_t trader, uint16_t qty, uint32_t price);
 
   void stop();
 

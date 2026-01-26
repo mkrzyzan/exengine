@@ -35,8 +35,10 @@ struct InputOrder
   uint16_t trader;
   uint16_t qty;
   Side side;
+  uint32_t price;
  }
  ```
+ The `price` field represents the limit price for the order. Buy orders will match with sell orders at or below the buy price, and sell orders will match with buy orders at or above the sell price, implementing price-time priority matching.
  Next, the order is taken by ```PlaceOrder``` method and matched against the appropriate order book. This process generates several types of Events:
 1. ```OrderPlaced``` - indicates that order been placed into order book and is still opened.
 2. ```Exec``` - means that order has been fully matched with some opposite order.
