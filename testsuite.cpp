@@ -19,10 +19,10 @@ TEST(MatchingEngineTest, FourOrders)
   Engine& eng = ex.engine;
   Event event;
 
-  eng.placeOrder('A', Buy, 666, 100, 0);
-  eng.placeOrder('A', Buy, 777, 200, 0);
-  eng.placeOrder('A', Sell, 888, 200, 0);
-  eng.placeOrder('A', Sell, 888, 100, 0);
+  eng.placeOrder('A', Buy, 666, 100, 100);
+  eng.placeOrder('A', Buy, 777, 200, 100);
+  eng.placeOrder('A', Sell, 888, 200, 100);
+  eng.placeOrder('A', Sell, 888, 100, 100);
 
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'A',666,100,Buy}) == event);
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,100,Buy}) == event);
@@ -44,8 +44,8 @@ TEST(MatchingEngineTest, CasesFromEmail)
   Engine& eng = ex.engine;
   Event event;
 
-  eng.placeOrder('S', Buy, 1, 200, 0);
-  eng.placeOrder('S', Sell, 2, 200, 0);
+  eng.placeOrder('S', Buy, 1, 200, 100);
+  eng.placeOrder('S', Sell, 2, 200, 100);
 
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',1,200,Buy}) == event);
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,200,Buy}) == event);
@@ -53,9 +53,9 @@ TEST(MatchingEngineTest, CasesFromEmail)
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',2,200,Sell}) == event);
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,0,None}) == event);
 
-  eng.placeOrder('G', Sell, 3, 300, 0);
-  eng.placeOrder('G', Buy, 4, 200, 0);
-  eng.placeOrder('G', Buy, 5, 200, 0);
+  eng.placeOrder('G', Sell, 3, 300, 100);
+  eng.placeOrder('G', Buy, 4, 200, 100);
+  eng.placeOrder('G', Buy, 5, 200, 100);
 
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'G',3,300,Sell}) == event);
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'G',0,300,Sell}) == event);
@@ -65,10 +65,10 @@ TEST(MatchingEngineTest, CasesFromEmail)
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'G',5,200,Buy}) == event);
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'G',0,100,Buy}) == event);
 
-  eng.placeOrder('H', Sell, 6, 200, 0);
-  eng.placeOrder('H', Sell, 7, 200, 0);
-  eng.placeOrder('H', Sell, 8, 200, 0);
-  eng.placeOrder('H', Buy, 9, 600, 0);
+  eng.placeOrder('H', Sell, 6, 200, 100);
+  eng.placeOrder('H', Sell, 7, 200, 100);
+  eng.placeOrder('H', Sell, 8, 200, 100);
+  eng.placeOrder('H', Buy, 9, 600, 100);
 
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'H',6,200,Sell}) == event);
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,200,Sell}) == event);
@@ -95,19 +95,19 @@ TEST(MatchingEngineTest, OverEatingOneSide)
   {
     Side otherSide = (Buy == side) ? Sell : Buy;
 
-    eng.placeOrder('S', side, 1, 100, 0);
-    eng.placeOrder('S', side, 2, 200, 0);
-    eng.placeOrder('S', side, 3, 300, 0);
-    eng.placeOrder('S', side, 4, 400, 0);
-    eng.placeOrder('S', side, 5, 500, 0);
-    eng.placeOrder('S', otherSide, 6, 100, 0);
-    eng.placeOrder('S', otherSide, 7, 100, 0);
-    eng.placeOrder('S', otherSide, 8, 100, 0);
-    eng.placeOrder('S', otherSide, 9, 150, 0);
-    eng.placeOrder('S', otherSide, 10, 300, 0);
-    eng.placeOrder('S', otherSide, 11, 100, 0);
-    eng.placeOrder('S', otherSide, 12, 700, 0);
-    eng.placeOrder('S', side, 13, 50, 0);
+    eng.placeOrder('S', side, 1, 100, 100);
+    eng.placeOrder('S', side, 2, 200, 100);
+    eng.placeOrder('S', side, 3, 300, 100);
+    eng.placeOrder('S', side, 4, 400, 100);
+    eng.placeOrder('S', side, 5, 500, 100);
+    eng.placeOrder('S', otherSide, 6, 100, 100);
+    eng.placeOrder('S', otherSide, 7, 100, 100);
+    eng.placeOrder('S', otherSide, 8, 100, 100);
+    eng.placeOrder('S', otherSide, 9, 150, 100);
+    eng.placeOrder('S', otherSide, 10, 300, 100);
+    eng.placeOrder('S', otherSide, 11, 100, 100);
+    eng.placeOrder('S', otherSide, 12, 700, 100);
+    eng.placeOrder('S', side, 13, 50, 100);
 
     ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',1,100,side}) == event);
     ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,100,side}) == event);
@@ -171,12 +171,12 @@ TEST(MatchingEngineTest, OrderSlicing)
   Engine& eng = ex.engine;
   Event event;
 
-  eng.placeOrder('H', Buy, 3, 5, 0);
-  eng.placeOrder('H', Sell, 1, 11, 0);
-  eng.placeOrder('H', Buy, 2, 7, 0);
-  eng.placeOrder('H', Buy, 3, 5, 0);
-  eng.placeOrder('H', Sell, 1, 11, 0);
-  eng.placeOrder('H', Buy, 3, 5, 0);
+  eng.placeOrder('H', Buy, 3, 5, 100);
+  eng.placeOrder('H', Sell, 1, 11, 100);
+  eng.placeOrder('H', Buy, 2, 7, 100);
+  eng.placeOrder('H', Buy, 3, 5, 100);
+  eng.placeOrder('H', Sell, 1, 11, 100);
+  eng.placeOrder('H', Buy, 3, 5, 100);
 
 
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 3, 5, Buy}) == event);
@@ -215,13 +215,13 @@ TEST_P(MatchingEnginePerformance, EventsBurst)
     uint32_t qty = 0;
     for (int i = 0; i < GetParam(); i++)
     {
-      eng.placeOrder('H', Buy, 1, 1, 0);
+      eng.placeOrder('H', Buy, 1, 1, 100);
       ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 1, 1, Buy}) == event);
       qty += 1;
       ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, qty, Buy}) == event);
     }
 
-    eng.placeOrder('H', Sell, 2, GetParam(), 0);
+    eng.placeOrder('H', Sell, 2, GetParam(), 100);
     for (int i = 0; i < GetParam(); i++)
     {
       ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 1, 1, Buy}) == event);
@@ -244,12 +244,12 @@ TEST(MultiProducerMultiConsumerQueueTest, OneThread_perf)
   for (uint32_t i = 0; i < 1000000; i++)
   {
     uint16_t x = static_cast<uint16_t>(i);
-    q.push(InputOrder{'A', x,x, (x % 2) ? Buy : Sell, 0});
+    q.push(InputOrder{'A', x,x, (x % 2) ? Buy : Sell, 100});
 
     if (i >= 10000)
     {
       q.pop(order);
-      ASSERT_TRUE ((InputOrder{'A', static_cast<uint16_t>(x-10000), static_cast<uint16_t>(x-10000), (x % 2) ? Buy : Sell, 0}) == order);
+      ASSERT_TRUE ((InputOrder{'A', static_cast<uint16_t>(x-10000), static_cast<uint16_t>(x-10000), (x % 2) ? Buy : Sell, 100}) == order);
     }
   }
 
@@ -263,7 +263,7 @@ TEST(MultiProducerMultiConsumerQueueTest, TwoThreads_perf)
     for (uint32_t i = 0; i < 1000000; i++)
     {
       uint16_t x = static_cast<uint16_t>(i);
-      q.push(InputOrder{'A', x, x, (x % 2) ? Buy : Sell, 0});
+      q.push(InputOrder{'A', x, x, (x % 2) ? Buy : Sell, 100});
     }
   });
 
@@ -272,7 +272,7 @@ TEST(MultiProducerMultiConsumerQueueTest, TwoThreads_perf)
     uint16_t x = static_cast<uint16_t>(i);
     InputOrder order;
     q.pop(order);
-    ASSERT_TRUE ((InputOrder{'A', x, x, (x % 2) ? Buy : Sell, 0}) == order);
+    ASSERT_TRUE ((InputOrder{'A', x, x, (x % 2) ? Buy : Sell, 100}) == order);
   }
 
   t1.join();
@@ -360,7 +360,7 @@ TEST_F(IntegrationTest, OneTraderConnectedToExchange)
   bool orderAccepted = false;
 
   auto init = [](TradingTool* me){
-    me->q->push(InputOrder{'H', me->id, 10, Sell, 0});
+    me->q->push(InputOrder{'H', me->id, 10, Sell, 100});
   };
 
   auto algo = [&](TradingTool* me, Event e){
@@ -401,7 +401,7 @@ TEST_F(IntegrationTest, TwoTraderConnectedToExchange)
   bool orderExec2 = false;
 
   auto init = [](TradingTool* me){
-    me->q->push(InputOrder{'H', me->id, 10, (me->id % 2) ? Sell : Buy, 0});
+    me->q->push(InputOrder{'H', me->id, 10, (me->id % 2) ? Sell : Buy, 100});
   };
 
   auto algo = [&](TradingTool* me, Event e){
@@ -452,7 +452,7 @@ TEST_F(IntegrationTest, ThreeTraderConnectedToExchange_OrderSlicing_15250_orders
   auto init = [&](TradingTool* me){
     //unique_lock<mutex> lc(m);
     //cout << "AddOrder: trader= " << me->id << endl;
-    me->q->push(InputOrder{'H', me->id, traderNotebook[me->id].slice, traderNotebook[me->id].s, 0});
+    me->q->push(InputOrder{'H', me->id, traderNotebook[me->id].slice, traderNotebook[me->id].s, 100});
 
     /*
     cout << "eng.placeOrder('" << 'H' 
@@ -481,7 +481,7 @@ TEST_F(IntegrationTest, ThreeTraderConnectedToExchange_OrderSlicing_15250_orders
         }
         if (toExec != 0)
         {
-          me->q->push(InputOrder{'H', me->id, traderNotebook[me->id].slice, traderNotebook[me->id].s, 0});
+          me->q->push(InputOrder{'H', me->id, traderNotebook[me->id].slice, traderNotebook[me->id].s, 100});
 
           /*
           cout << "eng.placeOrder('" << e.instrument
@@ -533,17 +533,17 @@ TEST_F(IntegrationTest, ThreeTraderConnectedToExchange_OrderSlicing_15250_orders
   ASSERT_TRUE (traderNotebook[3].done);
 }
 
-TEST(MatchingEngineTest, OrderLevelParameter)
+TEST(MatchingEngineTest, OrderPriceParameter)
 {
   Exchange ex;
   Notifier& notif = ex.notif;
   Engine& eng = ex.engine;
   Event event;
 
-  // Test that level parameter is accepted and orders are processed correctly
-  eng.placeOrder('L', Buy, 1, 100, 1);
-  eng.placeOrder('L', Buy, 2, 200, 2);
-  eng.placeOrder('L', Sell, 3, 150, 1);
+  // Test that price parameter is accepted and orders are processed correctly
+  eng.placeOrder('L', Buy, 1, 100, 50);
+  eng.placeOrder('L', Buy, 2, 200, 75);
+  eng.placeOrder('L', Sell, 3, 150, 50);
 
   // Verify events generated
   ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'L',1,100,Buy}) == event);
