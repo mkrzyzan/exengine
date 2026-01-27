@@ -88,9 +88,9 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
         top.qty -= matchQty;
         
         if (top.qty == 0) {
-          if (false == notify.events.push({Exec, instrument, top.trader, top.origQty, Sell, top.price, 0})) {
+          if (false == notify.events.push({Exec, instrument, top.trader, top.origQty, Sell, top.price})) {
             cout << "ENGINE WARNING: events ring is full!. Increase the event buffer size!.\n";
-            notify.events.forcePush({Exec, instrument, top.trader, top.origQty, Sell, top.price, 0});
+            notify.events.forcePush({Exec, instrument, top.trader, top.origQty, Sell, top.price});
           }
           orderQueue.pop_front();
         }
@@ -105,18 +105,18 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
     
     if (executedQty == qty) {
       // Fully executed
-      if (false == notify.events.push({Exec, instrument, trader, qty, Buy, price, 0})) {
+      if (false == notify.events.push({Exec, instrument, trader, qty, Buy, price})) {
         cout << "ENGINE WARNING: events ring is full!. Increase the event buffer size!.\n";
-        notify.events.forcePush({Exec, instrument, trader, qty, Buy, price, 0});
+        notify.events.forcePush({Exec, instrument, trader, qty, Buy, price});
       }
     } else if (remainQty > 0) {
       // Partial or no execution - just place in book
       // When placing, use remainQty for the current qty, but keep track of original order qty
       book.buyOrders[price].emplace_back(trader, qty, price);
       book.buyOrders[price].back().qty = remainQty;  // Update qty to remaining amount
-      if (false == notify.events.push({OrderPlaced, instrument, trader, qty, Buy, price, 0})) {
+      if (false == notify.events.push({OrderPlaced, instrument, trader, qty, Buy, price})) {
         cout << "ENGINE WARNING: events ring is full!. Increase the event buffer size!.\n";
-        notify.events.forcePush({OrderPlaced, instrument, trader, qty, Buy, price, 0});
+        notify.events.forcePush({OrderPlaced, instrument, trader, qty, Buy, price});
       }
     }
   } else {
@@ -133,9 +133,9 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
         top.qty -= matchQty;
         
         if (top.qty == 0) {
-          if (false == notify.events.push({Exec, instrument, top.trader, top.origQty, Buy, top.price, 0})) {
+          if (false == notify.events.push({Exec, instrument, top.trader, top.origQty, Buy, top.price})) {
             cout << "ENGINE WARNING: events ring is full!. Increase the event buffer size!.\n";
-            notify.events.forcePush({Exec, instrument, top.trader, top.origQty, Buy, top.price, 0});
+            notify.events.forcePush({Exec, instrument, top.trader, top.origQty, Buy, top.price});
           }
           orderQueue.pop_front();
         }
@@ -150,18 +150,18 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
     
     if (executedQty == qty) {
       // Fully executed
-      if (false == notify.events.push({Exec, instrument, trader, qty, Sell, price, 0})) {
+      if (false == notify.events.push({Exec, instrument, trader, qty, Sell, price})) {
         cout << "ENGINE WARNING: events ring is full!. Increase the event buffer size!.\n";
-        notify.events.forcePush({Exec, instrument, trader, qty, Sell, price, 0});
+        notify.events.forcePush({Exec, instrument, trader, qty, Sell, price});
       }
     } else if (remainQty > 0) {
       // Partial or no execution - just place in book
       // When placing, use remainQty for the current qty, but keep track of original order qty
       book.sellOrders[price].emplace_back(trader, qty, price);
       book.sellOrders[price].back().qty = remainQty;  // Update qty to remaining amount
-      if (false == notify.events.push({OrderPlaced, instrument, trader, qty, Sell, price, 0})) {
+      if (false == notify.events.push({OrderPlaced, instrument, trader, qty, Sell, price})) {
         cout << "ENGINE WARNING: events ring is full!. Increase the event buffer size!.\n";
-        notify.events.forcePush({OrderPlaced, instrument, trader, qty, Sell, price, 0});
+        notify.events.forcePush({OrderPlaced, instrument, trader, qty, Sell, price});
       }
     }
   }
@@ -169,8 +169,7 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
   // market data - calculate total outstanding qty across all price levels
   uint32_t totalOutstanding = 0;
   Side bestSide = None;
-  uint32_t bestBid = 0;
-  uint32_t bestAsk = 0;
+  uint32_t bestPrice = 0;
   
   if (!book.buyOrders.empty()) {
     for (const auto& priceLevel : book.buyOrders) {
@@ -179,7 +178,7 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
       }
     }
     bestSide = Buy;
-    bestBid = book.buyOrders.begin()->first;  // highest buy price (best bid)
+    bestPrice = book.buyOrders.begin()->first;  // highest buy price (best bid)
   }
   
   if (!book.sellOrders.empty()) {
@@ -191,18 +190,22 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
     }
     if (sellQty > 0) {
       totalOutstanding += sellQty;
-      bestAsk = book.sellOrders.begin()->first;  // lowest sell price (best ask)
       if (bestSide == Buy) {
-        bestSide = None;  // Both sides exist
+        bestSide = None;
+        // Both sides exist - use mid price
+        uint32_t bestBid = book.buyOrders.begin()->first;
+        uint32_t bestAsk = book.sellOrders.begin()->first;
+        bestPrice = (bestBid + bestAsk) / 2;
       } else {
         bestSide = Sell;
+        bestPrice = book.sellOrders.begin()->first;  // lowest sell price (best ask)
       }
     }
   }
   
-  if (false == notify.events.push({Tick, instrument, 0, totalOutstanding, bestSide, bestBid, bestAsk})) {
+  if (false == notify.events.push({Tick, instrument, 0, totalOutstanding, bestSide, bestPrice})) {
     cout << "ENGINE WARNING: events ring is full!. Increase the event buffer size!.\n";
-    notify.events.forcePush({Tick, instrument, 0, totalOutstanding, bestSide, bestBid, bestAsk});
+    notify.events.forcePush({Tick, instrument, 0, totalOutstanding, bestSide, bestPrice});
   }
 }
 

@@ -24,16 +24,16 @@ TEST(MatchingEngineTest, FourOrders)
   eng.placeOrder('A', Sell, 888, 200, 100);
   eng.placeOrder('A', Sell, 888, 100, 100);
 
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'A',666,100,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,100,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'A',777,200,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,300,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'A',666,100,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'A',888,200,Sell,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,100,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'A',777,200,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'A',888,100,Sell,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,0,None,0,0}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'A',666,100,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,100,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'A',777,200,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,300,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'A',666,100,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'A',888,200,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,100,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'A',777,200,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'A',888,100,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'A',0,0,None,0}) == event);
   ASSERT_TRUE (false == notif.events.pop(event));
 }
 
@@ -47,40 +47,40 @@ TEST(MatchingEngineTest, CasesFromEmail)
   eng.placeOrder('S', Buy, 1, 200, 100);
   eng.placeOrder('S', Sell, 2, 200, 100);
 
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',1,200,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,200,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',1,200,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',2,200,Sell,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,0,None,0,0}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',1,200,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,200,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',1,200,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',2,200,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,0,None,0}) == event);
 
   eng.placeOrder('G', Sell, 3, 300, 100);
   eng.placeOrder('G', Buy, 4, 200, 100);
   eng.placeOrder('G', Buy, 5, 200, 100);
 
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'G',3,300,Sell,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'G',0,300,Sell,0,100}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'G',4,200,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'G',0,100,Sell,0,100}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'G',3,300,Sell,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'G',5,200,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'G',0,100,Buy,100,0}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'G',3,300,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'G',0,300,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'G',4,200,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'G',0,100,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'G',3,300,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'G',5,200,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'G',0,100,Buy,100}) == event);
 
   eng.placeOrder('H', Sell, 6, 200, 100);
   eng.placeOrder('H', Sell, 7, 200, 100);
   eng.placeOrder('H', Sell, 8, 200, 100);
   eng.placeOrder('H', Buy, 9, 600, 100);
 
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'H',6,200,Sell,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,200,Sell,0,100}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'H',7,200,Sell,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,400,Sell,0,100}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'H',8,200,Sell,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,600,Sell,0,100}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'H',6,200,Sell,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'H',7,200,Sell,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'H',8,200,Sell,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'H',9,600,Buy,100,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,0,None,0,0}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'H',6,200,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,200,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'H',7,200,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,400,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'H',8,200,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,600,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'H',6,200,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'H',7,200,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'H',8,200,Sell,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'H',9,600,Buy,100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H',0,0,None,0}) == event);
   ASSERT_TRUE (false == notif.events.pop(event));
 }
 
@@ -109,50 +109,50 @@ TEST(MatchingEngineTest, OverEatingOneSide)
     eng.placeOrder('S', otherSide, 12, 700, 100);
     eng.placeOrder('S', side, 13, 50, 100);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',1,100,side,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,100,side,(side==Buy?100:0),(side==Sell?100:0)}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',1,100,side,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,100,side,100}) == event);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',2,200,side,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,300,side,(side==Buy?100:0),(side==Sell?100:0)}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',2,200,side,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,300,side,100}) == event);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',3,300,side,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,600,side,(side==Buy?100:0),(side==Sell?100:0)}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',3,300,side,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,600,side,100}) == event);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',4,400,side,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1000,side,(side==Buy?100:0),(side==Sell?100:0)}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',4,400,side,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1000,side,100}) == event);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',5,500,side,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1500,side,(side==Buy?100:0),(side==Sell?100:0)}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',5,500,side,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1500,side,100}) == event);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',1,100,side,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',6,100,otherSide,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1400,side,(side==Buy?100:0),(side==Sell?100:0)}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',1,100,side,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',6,100,otherSide,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1400,side,100}) == event);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',7,100,otherSide,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1300,side,(side==Buy?100:0),(side==Sell?100:0)}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',7,100,otherSide,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1300,side,100}) == event);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',2,200,side,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',8,100,otherSide,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1200,side,(side==Buy?100:0),(side==Sell?100:0)}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',2,200,side,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',8,100,otherSide,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1200,side,100}) == event);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',9,150,otherSide,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1050,side,(side==Buy?100:0),(side==Sell?100:0)}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',9,150,otherSide,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,1050,side,100}) == event);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',3,300,side,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',10,300,otherSide,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,750,side,(side==Buy?100:0),(side==Sell?100:0)}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',3,300,side,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',10,300,otherSide,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,750,side,100}) == event);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',11,100,otherSide,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,650,side,(side==Buy?100:0),(side==Sell?100:0)}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',11,100,otherSide,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,650,side,100}) == event);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',4,400,side,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',5,500,side,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',12,700,otherSide,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,50,otherSide,(otherSide==Buy?100:0),(otherSide==Sell?100:0)}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',4,400,side,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',5,500,side,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'S',12,700,otherSide,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,50,otherSide,100}) == event);
 
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',12,700,otherSide,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',13,50,side,100,0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,0,None,0,0}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',12,700,otherSide,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'S',13,50,side,100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'S',0,0,None,0}) == event);
 
     ASSERT_TRUE (false == notif.events.pop(event));
   }
@@ -179,23 +179,23 @@ TEST(MatchingEngineTest, OrderSlicing)
   eng.placeOrder('H', Buy, 3, 5, 100);
 
 
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 3, 5, Buy, 100, 0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, 5, Buy, 100, 0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 3, 5, Buy, 100, 0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 1, 11, Sell, 100, 0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, 6, Sell, 0, 100}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 1, 11, Sell, 100, 0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 2, 7, Buy, 100, 0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, 1, Buy, 100, 0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 3, 5, Buy, 100, 0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, 6, Buy, 100, 0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 2, 7, Buy, 100, 0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 3, 5, Buy, 100, 0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 1, 11, Sell, 100, 0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, 5, Sell, 0, 100}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 1, 11, Sell, 100, 0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 3, 5, Buy, 100, 0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, 0, None, 0, 0}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 3, 5, Buy, 100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, 5, Buy, 100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 3, 5, Buy, 100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 1, 11, Sell, 100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, 6, Sell, 100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 1, 11, Sell, 100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 2, 7, Buy, 100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, 1, Buy, 100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 3, 5, Buy, 100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, 6, Buy, 100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 2, 7, Buy, 100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 3, 5, Buy, 100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 1, 11, Sell, 100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, 5, Sell, 100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 1, 11, Sell, 100}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 3, 5, Buy, 100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, 0, None, 0}) == event);
   ASSERT_FALSE ( notif.events.pop(event));
 }
 
@@ -216,18 +216,18 @@ TEST_P(MatchingEnginePerformance, EventsBurst)
     for (int i = 0; i < GetParam(); i++)
     {
       eng.placeOrder('H', Buy, 1, 1, 100);
-      ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 1, 1, Buy, 100, 0}) == event);
+      ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced, 'H', 1, 1, Buy, 100}) == event);
       qty += 1;
-      ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, qty, Buy, 100, 0}) == event);
+      ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'H', 0, qty, Buy, 100}) == event);
     }
 
     eng.placeOrder('H', Sell, 2, GetParam(), 100);
     for (int i = 0; i < GetParam(); i++)
     {
-      ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 1, 1, Buy, 100, 0}) == event);
+      ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 1, 1, Buy, 100}) == event);
     }
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 2, GetParam(), Sell, 100, 0}) == event);
-    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick, 'H', 0, 0, None, 0, 0}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec, 'H', 2, GetParam(), Sell, 100}) == event);
+    ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick, 'H', 0, 0, None, 0}) == event);
     ASSERT_TRUE (false == notif.events.pop(event));
   }
 }
@@ -287,7 +287,7 @@ TEST(SingleProducerSingleConsumerQueueTest, TwoThreads_perf)
     while (c < 1000000)
     {
       uint16_t x = static_cast<uint16_t>(c);
-      if (false == q.push(Event{Exec, 'A', x, x, (x % 2) ? Buy : Sell, 100, 0}))
+      if (false == q.push(Event{Exec, 'A', x, x, (x % 2) ? Buy : Sell, 100}))
       {
         this_thread::yield();
       }
@@ -309,14 +309,13 @@ TEST(SingleProducerSingleConsumerQueueTest, TwoThreads_perf)
     }
     else
     {
-      //ASSERT_TRUE ((Event{Exec, 'A', x, x, (x % 2) ? Buy : Sell, 100, 0}) == event);
+      //ASSERT_TRUE ((Event{Exec, 'A', x, x, (x % 2) ? Buy : Sell, 100}) == event);
       ASSERT_EQ (Exec, event.type);
       ASSERT_EQ ('A', event.instrument);
       ASSERT_EQ (x, event.trader);
       ASSERT_EQ (x, event.qty);
       ASSERT_EQ ( (x%2) ? Buy : Sell, event.side);
       ASSERT_EQ (100u, event.price);
-      ASSERT_EQ (0u, event.askPrice);
 
       c++;
     }
@@ -548,15 +547,15 @@ TEST(MatchingEngineTest, OrderPriceParameter)
   eng.placeOrder('L', Sell, 3, 150, 50);
 
   // Verify events generated
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'L',1,100,Buy,50,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'L',0,100,Buy,50,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'L',2,200,Buy,75,0}) == event);
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'L',0,300,Buy,75,0}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'L',1,100,Buy,50}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'L',0,100,Buy,50}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{OrderPlaced,'L',2,200,Buy,75}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'L',0,300,Buy,75}) == event);
   // Sell @50 matches with best buy (trader 2 @75) for 150 qty
   // Trader 2's order is partially filled (150 of 200), so only the sell generates Exec
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'L',3,150,Sell,50,0}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Exec,'L',3,150,Sell,50}) == event);
   // Remaining: trader 2 has 50 @75, trader 1 has 100 @50 = 150 total
-  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'L',0,150,Buy,75,0}) == event);
+  ASSERT_TRUE (true == notif.events.pop(event) && (Event{Tick,'L',0,150,Buy,75}) == event);
   ASSERT_FALSE (notif.events.pop(event));
 }
 
