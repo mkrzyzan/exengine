@@ -47,7 +47,8 @@ struct Event
   uint16_t trader;
   uint32_t qty;
   Side side;
-  uint32_t price;
+  uint32_t price;      // For OrderPlaced/Exec: the order/execution price. For Tick: best bid
+  uint32_t askPrice;   // For OrderPlaced/Exec: 0 (unused). For Tick: best ask
 
   bool operator==(const Event& rhs)
   { 
@@ -56,7 +57,8 @@ struct Event
            trader == rhs.trader &&
            qty == rhs.qty && 
            side == rhs.side &&
-           price == rhs.price;
+           price == rhs.price &&
+           askPrice == rhs.askPrice;
   }
 };
 
