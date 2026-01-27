@@ -192,10 +192,8 @@ void Engine::placeOrder(char instrument, Side side, uint16_t trader, uint16_t qt
       totalOutstanding += sellQty;
       if (bestSide == Buy) {
         bestSide = None;
-        // Both sides exist - use mid price
-        uint32_t bestBid = book.buyOrders.begin()->first;
-        uint32_t bestAsk = book.sellOrders.begin()->first;
-        bestPrice = (bestBid + bestAsk) / 2;
+        // Both sides exist - use best bid
+        bestPrice = book.buyOrders.begin()->first;
       } else {
         bestSide = Sell;
         bestPrice = book.sellOrders.begin()->first;  // lowest sell price (best ask)
