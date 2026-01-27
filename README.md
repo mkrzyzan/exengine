@@ -61,10 +61,12 @@ struct Event
   uint16_t trader;
   uint32_t qty;
   Side side;
+  uint32_t price;
 }
 ```
 ```trader``` - the trader id for whom the order belongs. Notifier uses it to find the client to notify. For the Tick event, trader = 0.
 ```qty``` - For OrderPlaced,Exec the quantity of the order placed, executed. For Tick, the outstanding quantity in order book.
+```price``` - For OrderPlaced events, the limit price of the placed order. For Exec events, the execution price of the matched trade. For Tick events, the best bid price (if only buy orders), best ask price (if only sell orders), or mid price (if both sides exist).
 
 ## Notifier
 Defined in file ```exchange.h``` and ```exchange.cpp```.
